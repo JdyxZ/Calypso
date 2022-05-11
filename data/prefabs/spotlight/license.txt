@@ -1,0 +1,11 @@
+Model Information:
+* title:	Stage Light Zoom Spot
+* source:	https://sketchfab.com/3d-models/stage-light-zoom-spot-8d4ef7df22d84d4c8dafc78a8dbeff12
+* author:	Mike Rowley (https://sketchfab.com/scrumpy26)
+
+Model License:
+* license type:	CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
+* requirements:	Author must be credited. No commercial use.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Stage Light Zoom Spot" (https://sketchfab.com/3d-models/stage-light-zoom-spot-8d4ef7df22d84d4c8dafc78a8dbeff12) by Mike Rowley (https://sketchfab.com/scrumpy26) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)

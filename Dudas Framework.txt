@@ -1,0 +1,29 @@
+Preguntas RTG
+
+LAB1
+
+- Z-Buffer test del shadder (por qué no lo hacemos con los u_color?)
+- FragColor (el color no debería de normalizarse después de multiplicarse por la luz?)
+- Cómo hacer correctamente el blending en el multipass?
+- Cómo afectan el resto de texturas sobre la ecuación de la luz?
+- Cómo afecta los parámetros específicos de cada tipo de luz a la ecuación de la luz?
+- Con qué valor deberíamos inicializar cada textura en caso de ser NULL?
+- Cuándo hay más de cinco luces, en el multi pass hacemos un bucle?
+
+
+- Número de render calls que deberíamos tener en single pass y multi pass.
+- Qué onda si en vez de normalizar los vectores en la GPU y los cargamos prenormalizados de la CPU?
+- Sería interesante hacer un elapsed time con imGUI para el single pass y el multi pass?
+- La estructura de for con uniforme es óptima?
+- La emissive light se suma directamente? Problema con el multipass y la last iteration.
+- Qué es el uv channel de la struct Sampler?
+- Hay que normalizar la normal de la textura normal?
+
+- Está el exponente de cone angle considerado en las spot lights?
+- 
+
+Unrolling -> Técnica que permite optimizar y accelerar la performance de la GPU en los for loops. 
+Roughness y metallness son floats.
+Roughness -> Factor alpha
+Metalness -> Cantidad de specular
+Occlusion texture -> Cantidad de luz ambiente que le llega a un objeto

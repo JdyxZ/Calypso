@@ -1,0 +1,104 @@
+	//Singlepass
+	int starting_light = 0;
+	int final_light = min(4, lights.size() - 1);
+	while (starting_light != lights.size()) 
+	{
+		std::vector<Vector3> lights_position;
+		std::vector<Vector3> lights_color;
+		std::vector<float> lights_max_distance;
+		int num_lights = final_light - starting_light + 1;
+
+		for (int i = starting_light; i <= final_light; i++) 
+		{
+			lights_position.push_back(lights[i]->model.getTranslation());
+			lights_color.push_back(lights[i]->color * lights[i]->intensity);
+			lights_max_distance.push_back(lights[i]->max_distance);
+		}
+		shader->setUniform3Array("u_lights_position", (float*)&lights_position[0], num_lights);
+		shader->setUniform3Array("u_lights_color", (float*)&lights_color[0], num_lights);
+		shader->setUniform1Array("u_lights_max_distance", &lights_max_distance[0], num_lights);
+		shader->setUniform("u_num_lights", num_lights);
+
+		//do the draw call that renders the mesh into the screen
+		rc->mesh->render(GL_TRIANGLES);
+
+		starting_light = final_light + 1;
+		final_light = min(4, lights.size() - 1);
+		shader->setUniform("u_ambient_light", Vector3());
+
+	}
+
+
+void Matrix44::rotate3D(Vector3* angles) {
+	
+	Matrix44 Rx;
+	Matrix44 Ry;
+	Matrix44 Rz;
+
+	Rx.m[0] = 1; Rx.m[4] = 0; 				Rx.m[8] = 0; 				Rx.m[12] = 0;
+	Rx.m[1] = 0; Rx.m[5] = cos(angles->x); 	Rx.m[9] = -sin(angles->x);	Rx.m[13] = 0;
+	Rx.m[2] = 0; Rx.m[6] = sin(angles->x); 	Rx.m[10] = cos(angles->x); 	Rx.m[14] = 0;
+	Rx.m[3] = 0; Rx.m[7] = 0; 				Rx.m[11] = 0; 				Rx.m[15] = 0;
+
+	Ry.m[0] = cos(angles->y);	Ry.m[4] = 0; 	Ry.m[8] = sin(angles->y); 		Ry.m[12] = 0;
+	Ry.m[1] = 0; 				Ry.m[5] = 1; 	Ry.m[9] = 0; 					Ry.m[13] = 0;
+	Ry.m[2] = -sin(angles->y); 	Ry.m[6] = 0; 	Ry.m[10] = cos(angles->y);		Ry.m[14] = 0;
+	Ry.m[3] = 0; 				Ry.m[7] = 0; 	Ry.m[11] = 0; 					Ry.m[15] = 0;
+
+	Rz.m[0] = cos(angles->z); 		Rz.m[4] = -sin(angles->z); 		Rz.m[8] = 0; 	Rz.m[12] = 0;
+	Rz.m[1] = sin(angles->z); 		Rz.m[5] = cos(angles->z); 		Rz.m[9] = 0;	Rz.m[13] = 0;
+	Rz.m[2] = 0; 					Rz.m[6] = 0; 					Rz.m[10] = 1; 	Rz.m[14] = 0;
+	Rz.m[3] = 0; 					Rz.m[7] = 0; 					Rz.m[11] = 0; 	Rz.m[15] = 0;
+
+	*this = Rx*Ry*Rz * *this;
+	
+}
+
+//View Matrix
+light_camera.lookAt(light->model.getTranslation(), light->model.frontVector(), light->model.topVector());
+
+//Clean vectors from previous iteration
+lights_position.clear();
+lights_color.clear();
+lights_intensity.clear();
+lights_max_distance.clear();
+lights_type.clear();
+spots_direction.clear();
+spots_cone.clear();
+directionals_front.clear();
+cast_shadows.clear();
+shadows_bias.clear();
+shadows_vp.clear();
+
+		if (selected_entity->entity_type == GTR::eEntityType::LIGHT)
+		{
+			GTR::LightEntity* light = (GTR::LightEntity*)selected_entity;
+			light->light_has_moved = true;
+		}
+
+
+
+
+
+					if (scene->entities[0]->entity_type == GTR::eEntityType::PREFAB)
+						{
+							GTR::PrefabEntity* pent = (GTR::PrefabEntity*)scene->entities[0];
+							if (pent->prefab)
+							{
+								pent->prefab->root.material->color_texture.texture->image.saveTGA(shadow_image_name.c_str());
+								cout << endl << "Atlas succesfully saved" << endl;
+							}
+						}
+
+shadow_uv.x = (shadow_uv.x + u_shadow_index)/u_num_shadows;
+
+
+	cout << endl << "Number of shadows: " << num_shadows << endl;
+	cout << "Number of shadows per scope: " << num_shadows_per_scope << endl;
+	cout << "Current shadow scope: " << shadow_scope << endl;
+	cout << "Number of shadows within the current scope :" << num_shadows_in_scope << endl;
+	cout << "Starting shadow: " << starting_shadow << endl;
+	cout << "Final shadow: " << final_shadow << endl;
+	cout << "Prior shadow atlas scope: " << scene->shadow_atlas_scope << endl;
+	scene->shadow_atlas_scope = shadow_scope;
+	cout << "After shadow atlas scope: " << scene->shadow_atlas_scope << endl;

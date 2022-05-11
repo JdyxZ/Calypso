@@ -1,0 +1,11 @@
+Model Information:
+* title:	Japanese Drawer Chest
+* source:	https://sketchfab.com/3d-models/japanese-drawer-chest-8fa883cbdee34379a25384442da0ab62
+* author:	GiyoP (https://sketchfab.com/GiyoP)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Japanese Drawer Chest" (https://sketchfab.com/3d-models/japanese-drawer-chest-8fa883cbdee34379a25384442da0ab62) by GiyoP (https://sketchfab.com/GiyoP) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

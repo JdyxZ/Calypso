@@ -1,0 +1,281 @@
+{
+	"background_color":[0.01,0.01,0.1],
+	"ambient_light":[0.08,0.13,0.18],
+	"environment":"night.hdre",
+	"camera_position":[-300,90,-150],
+	"camera_target":[0,40,0],
+	"camera_fov":60,
+	"entities":[
+		{
+			"name":"floor",
+			"type":"PREFAB",
+			"filename":"prefabs/floor.glb",
+			"position":[0,0,0]
+		},
+		{
+			"name":"GMC",
+			"type":"PREFAB",
+			"filename":"prefabs/gmc/scene.gltf",
+			"position":[-183,-2,-67],
+			"angle":-45
+		},
+		{
+			"name":"Fallout",
+			"type":"PREFAB",
+			"filename":"prefabs/fallout/scene.gltf",
+			"position":[-190.435,21,222],
+			"angle":230,
+			"scale":[0.4,0.4,0.4]
+		},
+		{
+			"name":"Fallout 2",
+			"type":"PREFAB",
+			"filename":"prefabs/fallout/scene.gltf",
+			"position":[350,21,926],
+			"angle":160,
+			"scale":[0.4,0.4,0.4]
+		},
+		{
+			"name":"Ambulance",
+			"type":"PREFAB",
+			"filename":"prefabs/ambulance/scene.gltf",
+			"position":[866,2.8,-225],
+			"angle":45
+		},
+		{
+			"name":"Matador",
+			"type":"PREFAB",
+			"filename":"prefabs/matador/scene.gltf",
+			"position":[841,0.05,379],
+			"angle":-135,
+			"scale":[0.4,0.4,0.4]
+		},
+		{
+			"name":"Matador 2",
+			"type":"PREFAB",
+			"filename":"prefabs/matador/scene.gltf",
+			"position":[350,21,-926],
+			"angle":-200,
+			"scale":[0.4,0.4,0.4]
+		},
+		{
+			"name":"house 1",
+			"type":"PREFAB",
+			"filename":"prefabs/house_test/scene.gltf",
+			"position":[300,0,200],
+			"scale":[0.4,0.4,0.4]
+		},
+		{
+			"name":"house 2",
+			"type":"PREFAB",
+			"filename":"prefabs/house_test/scene.gltf",
+			"position":[300,0,-200],
+			"scale":[0.4,0.4,0.4]
+		},
+		{
+			"name":"trash",
+			"type":"PREFAB",
+			"filename":"prefabs/trash_can/scene.gltf",
+			"position":[137.065,0,33.207],
+			"scale":[0.5,0.5,0.5]
+		},
+		{
+			"name":"tree",
+			"type":"PREFAB",
+			"filename":"prefabs/tree/scene.gltf",
+			"position":[80,0,-400],
+			"angle":-90,
+			"scale":[0.8,0.8,0.8]
+		},
+		{
+			"name":"spot 1",
+			"type":"PREFAB",
+			"filename":"prefabs/spotlight/scene.gltf",
+			"position":[156,109,-149],
+			"angle":160,
+			"scale":[6.0,6.0,6.0]
+		},
+		{
+			"name":"spot 2",
+			"type":"PREFAB",
+			"filename":"prefabs/spotlight/scene.gltf",
+			"position":[156,109,315],
+			"angle":195,
+			"scale":[6.0,6.0,6.0]
+		},
+		{
+			"name":"spot 3",
+			"type":"PREFAB",
+			"filename":"prefabs/spotlight/scene.gltf",
+			"position":[510.221,109.024,-150.453],
+			"angle":-20,
+			"scale":[6.0,6.0,6.0]
+		},
+		{
+			"name":"spot 4",
+			"type":"PREFAB",
+			"filename":"prefabs/spotlight/scene.gltf",
+			"position":[505.785,109,315],
+			"angle":15,
+			"scale":[6.0,6.0,6.0]
+		},
+		{
+			"name":"flash",
+			"type":"PREFAB",
+			"filename":"prefabs/flashlight/scene.gltf",
+			"position":[18.564,41.5,-126.913],
+			"custom_rotation":0,
+			"scale":[1,1,1]
+		},
+		{
+			"name":"front drawer",
+			"type":"PREFAB",
+			"filename":"prefabs/drawer/scene.gltf",
+			"position":[16.137,0,-111.671],
+			"angle": 180,
+			"scale":[0.2,0.2,0.2]
+		},
+		{
+			"name":"back drawer",
+			"type":"PREFAB",
+			"filename":"prefabs/drawer/scene.gltf",
+			"position":[583.318,0,62.557],
+			"scale":[0.2,0.2,0.2]
+		},
+		{
+			"name":"lamp",
+			"type":"PREFAB",
+			"filename":"prefabs/lamp/scene.gltf",
+			"position":[583.318,40,62.557],
+			"scale":[1,1,1]
+		},
+		{
+			"name":"lamp light",
+			"type":"LIGHT",
+			"position":[583.991,54.991,62.783],
+			"color":[0.67,0.67,0.45],
+			"intensity":3,
+			"max_dist":250,
+			"light_type":"POINT"
+		},
+
+		{
+			"name":"flashlight",
+			"type":"LIGHT",
+			"position":[35.367,41,-111.171],
+			"angle": 137,
+			"color":[1,0.9,0.8],
+			"intensity":5,
+			"max_dist":1000,
+			"cone_angle":20,
+			"cone_exp":30,
+			"light_type":"SPOT",
+			"cast_shadows": true,
+			"shadow_bias": 0.001
+		},
+		{
+			"name":"moonlight",
+			"type":"LIGHT",
+			"position":[150,300,50],
+			"target":[320,0,200],
+			"color":[0.1,0.2,0.4],
+			"intensity":1.0,
+			"area_size":1500,
+			"max_dist":1000,
+			"cast_shadows": true,
+			"light_type":"DIRECTIONAL"
+		},
+		{
+			"name":"spotlight 1",
+			"type":"LIGHT",
+			"position":[147,106,-145],
+			"angle": 255,
+			"color":[0.3,0.6,0.9],
+			"intensity":30,
+			"max_dist":1500,
+			"cone_angle":30,
+			"cone_exp":12,
+			"light_type":"SPOT",
+			"cast_shadows": true,
+			"shadow_bias": 0.001
+		},
+		{
+			"name":"spotlight 2",
+			"type":"LIGHT",
+			"position":[145,106,313],
+			"angle": 275,
+			"color":[0.8,0.2,0.7],
+			"intensity":20,
+			"max_dist":1500,
+			"cone_angle":30,
+			"cone_exp":12,
+			"light_type":"SPOT",
+			"cast_shadows": true,
+			"shadow_bias": 0.001
+		},
+		{
+			"name":"spotlight 3",
+			"type":"LIGHT",
+			"position":[522.627,105.815,-154.835],
+			"angle": 75,
+			"color":[0.25,0.75,0.2],
+			"intensity":30,
+			"max_dist":1500,
+			"cone_angle":30,
+			"cone_exp":12,
+			"light_type":"SPOT",
+			"cast_shadows": true,
+			"shadow_bias": 0.001
+		},
+		{
+			"name":"spotlight 4",
+			"type":"LIGHT",
+			"position":[516.662,105.815,317.653],
+			"angle": 105,
+			"color":[0.2,0.1,0.6],
+			"intensity":20,
+			"max_dist":1500,
+			"cone_angle":30,
+			"cone_exp":12,
+			"light_type":"SPOT",
+			"cast_shadows": true,
+			"shadow_bias": 0.001
+		},
+		{
+			"name":"spotlight emissive 1",
+			"type":"LIGHT",
+			"position":[147,106,-145],
+			"color":[0.3,0.6,0.9],
+			"intensity":15,
+			"max_dist":20,
+			"light_type":"POINT"
+		},
+		{
+			"name":"spotlight emissive 2",
+			"type":"LIGHT",
+			"position":[145,106,313],
+			"color":[0.8,0.2,0.7],
+			"intensity":15,
+			"max_dist":20,
+			"light_type":"POINT"
+		},
+		{
+			"name":"spotlight emissive 3",
+			"type":"LIGHT",
+			"position":[519.777,107.387,-153.666],
+			"color":[0.25,0.75,0.2],
+			"intensity":15,
+			"max_dist":20,
+			"light_type":"POINT"
+		},
+		{
+			"name":"spotlight emissive 4",
+			"type":"LIGHT",
+			"position":[516.6,107.233,317.915],
+			"color":[0.2,0.1,0.6],
+			"intensity":15,
+			"max_dist":20,
+			"light_type":"POINT"
+		}
+	]
+}
