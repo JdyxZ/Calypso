@@ -8,7 +8,7 @@
 	"entities":	[{
 			"name":	"floor",
 			"type":	"PREFAB",
-			"filename":	"prefabs/floor.glb",
+			"filename":	"prefabs/floor/floor.glb",
 			"model":	[1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 		}, {
 			"name":	"GMC",

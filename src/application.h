@@ -35,6 +35,12 @@ public:
 	bool render_wireframe; //in case we want to render everything in wireframe mode
 	const char* shadow_resolutions[4] = { "512 x 512","1024 x 1024", "2048 x 2048", "4096 x 4096" }; //Array of shadow resolutions
 
+	//Entity creator
+	bool render_editor;
+	int current_entity_type;
+	const char* entity_types[2] = { "PREFAB","LIGHT" }; //Array of entity types for the entity creator
+	const char** assets;
+
 	Application( int window_width, int window_height, SDL_Window* window );
 
 	//main functions
@@ -42,6 +48,7 @@ public:
 	void update( double dt );
 
 	void renderDebugGUI(void);
+	void renderEntityEditor();
 	void renderDebugGizmo();
 
 	//events

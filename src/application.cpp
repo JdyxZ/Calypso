@@ -14,6 +14,8 @@
 #include <cmath>
 #include <string>
 #include <cstdio>
+#include <iostream>
+#include <filesystem>
 
 using namespace std;
 
@@ -39,13 +41,27 @@ Application::Application(int window_width, int window_height, SDL_Window* window
 	render_debug = true;
 	render_grid = false;
 	render_gui = true;
+	render_editor = true;
 	render_wireframe = false;
 
+	current_entity_type = 0;
 	fps = 0;
 	frame = 0;
 	time = 0.0f;
 	elapsed_time = 0.0f;
 	mouse_locked = false;
+
+	//Compute assets vector
+	string prefabs_path = filesystem::current_path().string() + "\\data\\prefabs";
+	vector<string> tmp;
+	int assets_size = 0;
+	for (const auto& entry : filesystem::directory_iterator(prefabs_path))
+	{
+		string str_path = entry.path().string();
+		string asset = str_path.substr(prefabs_path.size() + 1, str_path.size());
+		assets_size += asset.size();
+		tmp.push_back(asset);
+	};
 
 	//loads and compiles several shaders from one single file
     //change to "data/shader_atlas_osx.txt" if you are in XCODE
@@ -306,6 +322,24 @@ void Application::renderDebugGUI(void)
 	}
 
 	ImGui::PopStyleColor();
+#endif
+}
+
+void Application::renderEntityEditor()
+{
+#ifndef SKIP_IMGUI //to block this code from compiling if we want
+
+	//Select entity
+	ImGui::Combo("Entity type", &current_entity_type, entity_types, IM_ARRAYSIZE(entity_types));
+	
+	//Entity features
+	switch (current_entity_type) {
+	case(0):
+		ImGui::Combo("Assets", &current_entity_type, entity_types, IM_ARRAYSIZE(entity_types));
+	case(1):
+		ImGui::Combo("Light type", &current_entity_type, entity_types, IM_ARRAYSIZE(entity_types));
+	}
+
 #endif
 }
 

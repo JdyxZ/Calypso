@@ -201,6 +201,9 @@ bool GTR::Scene::save()
 	//Notify the success
 	cout << endl << "Scene successfully saved" << endl;
 
+	//Free memory
+	cJSON_Delete(json);
+
 	return true;
 }
 
