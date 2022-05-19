@@ -42,7 +42,6 @@ void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
 {	
 	//Set current scene and camera
 	this->scene = scene;
-	this->camera = camera;
 
 	//Set the clear color (the background color)
 	glClearColor(scene->background_color.x, scene->background_color.y, scene->background_color.z, 1.0);
@@ -137,7 +136,7 @@ void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
 			}
 			if (compute_directional)
 			{
-				computeDirectionalShadowMap(light);
+				computeDirectionalShadowMap(light,camera);
 				light->directional_shadow_tracker = false;
 			}
 		}
@@ -668,7 +667,7 @@ void GTR::Renderer::computeSpotShadowMap(LightEntity* light)
 }
 
 //Compute directional shadow maps into the shadow atlas
-void GTR::Renderer::computeDirectionalShadowMap(LightEntity* light)
+void GTR::Renderer::computeDirectionalShadowMap(LightEntity* light, Camera* camera)
 {
 	//Speed boost
 	glColorMask(false, false, false, false);

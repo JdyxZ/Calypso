@@ -28,9 +28,8 @@ namespace GTR {
 
 	public:
 
-		//APPLICATION VARIABLES
+		//Application variables
 		Scene* scene;
-		Camera* camera;
 
 		//Render variables
 		std::vector<LightEntity*> lights; //Here we store each Light to be sent to the Shadder.
@@ -63,7 +62,7 @@ namespace GTR {
 		//Shadow Atlas
 		void createShadowAtlas();
 		void computeSpotShadowMap(LightEntity* light);
-		void computeDirectionalShadowMap(LightEntity* light);
+		void computeDirectionalShadowMap(LightEntity* light, Camera* camera);
 		void showShadowAtlas();
 
 	};

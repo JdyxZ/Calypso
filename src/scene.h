@@ -102,7 +102,7 @@ namespace GTR {
 
 		Vector3 background_color;
 		Vector3 ambient_light;
-		Camera main_camera;
+		Camera* main_camera;
 
 		//Scene shadows
 		FBO* fbo; //Frame Buffer Object
@@ -135,9 +135,11 @@ namespace GTR {
 
 		void clear();
 		void addEntity(BaseEntity* entity);
-
-		bool load(const char* filename);
 		BaseEntity* createEntity(std::string type);
+
+		//JSON methods
+		bool load(const char* filename);
+		bool save(const char* filename);
 	};
 
 };

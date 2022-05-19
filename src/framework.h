@@ -252,7 +252,9 @@ class Matrix44
 		void setRotation( float angle_in_rad, const Vector3& axis );
 		void setScale(float x, float y, float z);
 
+		//TRS values
 		Vector3 getTranslation();
+		Vector3 getScale();
 
 		bool getXYZ(float* euler) const;
 

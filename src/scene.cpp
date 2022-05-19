@@ -3,6 +3,7 @@
 
 #include "prefab.h"
 #include "extra/cJSON.h"
+#include <fstream> 
 
 GTR::Scene* GTR::Scene::instance = NULL;
 
@@ -65,7 +66,7 @@ bool GTR::Scene::load(const char* filename)
 		return false;
 	}
 
-	//parse json string 
+	//Parse JSON string 
 	cJSON* json = cJSON_Parse(content.c_str());
 	if (!json)
 	{
@@ -73,14 +74,18 @@ bool GTR::Scene::load(const char* filename)
 		return false;
 	}
 
-	//read global properties
+	//Read global properties
 	background_color = readJSONVector3(json, "background_color", background_color);
 	ambient_light = readJSONVector3(json, "ambient_light", ambient_light );
-	main_camera.eye = readJSONVector3(json, "camera_position", main_camera.eye);
-	main_camera.center = readJSONVector3(json, "camera_target", main_camera.center);
-	main_camera.fov = readJSONNumber(json, "camera_fov", main_camera.fov);
+	Vector3 eye = readJSONVector3(json, "camera_position", main_camera->eye);
+	Vector3 center = readJSONVector3(json, "camera_target", main_camera->center);
+	float fov = readJSONNumber(json, "camera_fov", main_camera->fov);
 
-	//entities
+	//Set the parameters of the main camera
+	main_camera->lookAt(eye,center, Vector3(0, 1, 0));
+	main_camera->fov = fov;
+
+	//Entities
 	cJSON* entities_json = cJSON_GetObjectItemCaseSensitive(json, "entities");
 	cJSON* entity_json;
 	cJSON_ArrayForEach(entity_json, entities_json)
@@ -149,6 +154,89 @@ bool GTR::Scene::load(const char* filename)
 
 	//free memory
 	cJSON_Delete(json);
+
+	return true;
+}
+
+bool GTR::Scene::save(const char* filename)
+{
+	std::string content;
+
+	this->filename = filename;
+	std::cout << " + Reading scene JSON: " << filename << "..." << std::endl;
+
+	if (!readFile(filename, content))
+	{
+		std::cout << "- ERROR: Scene file not found: " << filename << std::endl;
+		return false;
+	}
+
+	//Parse JSON string
+	cJSON* json = cJSON_Parse(content.c_str());
+	if (!json)
+	{
+		std::cout << "ERROR: Scene JSON has errors: " << filename << std::endl;
+		return false;
+	}
+
+	//Replace global properties
+	replaceJSONVector3(json, "background_color", background_color);
+	replaceJSONVector3(json, "ambient_light", ambient_light);
+	replaceJSONVector3(json, "camera_position", main_camera->eye);
+	replaceJSONVector3(json, "camera_target", main_camera->center);
+	replaceJSONNumber(json, "camera_fov", 80);
+
+	//Entities
+	cJSON* entities_json = cJSON_GetObjectItemCaseSensitive(json, "entities");
+
+	for (int i = 0; i < entities.size(); ++i)
+	{
+		BaseEntity* entity = entities[i];
+		cJSON* entity_json = cJSON_GetArrayItem(entities_json, i);
+
+		if (readJSONString(entity_json, "name", "") != entities[i]->name)
+			continue;
+
+		switch (entity->entity_type)
+		{
+			case (PREFAB):
+			{
+				PrefabEntity* prefab = (PrefabEntity*)entity;
+				if (cJSON_GetObjectItem(entity_json, "position")) replaceJSONVector3(entity_json, "position", prefab->model.getTranslation());
+				if (cJSON_GetObjectItem(entity_json, "scale")) replaceJSONVector3(entity_json, "scale", prefab->model.getScale());
+				break;
+			}
+			case (LIGHT):
+			{
+				LightEntity* light = (LightEntity*)entity;
+				if (cJSON_GetObjectItem(entity_json, "position")) replaceJSONVector3(entity_json, "position", light->model.getTranslation());
+				if (cJSON_GetObjectItem(entity_json, "color")) replaceJSONVector3(entity_json, "color", light->color);
+				if (cJSON_GetObjectItem(entity_json, "intensity")) replaceJSONNumber(entity_json, "intensity", light->intensity);
+				if (cJSON_GetObjectItem(entity_json, "max_dist")) replaceJSONNumber(entity_json, "max_dist", light->max_distance);
+				if (cJSON_GetObjectItem(entity_json, "cone_angle")) replaceJSONNumber(entity_json, "cone_angle", light->cone_angle);
+				if (cJSON_GetObjectItem(entity_json, "cone_exp")) replaceJSONNumber(entity_json, "cone_exp", light->cone_exp);
+				if (cJSON_GetObjectItem(entity_json, "area_size")) replaceJSONNumber(entity_json, "area_size", light->area_size);
+				if (cJSON_GetObjectItem(entity_json, "cast_shadows")) replaceJSONBoolean(entity_json, "cast_shadows", light->cast_shadows);
+				if (cJSON_GetObjectItem(entity_json, "shadow_bias")) replaceJSONNumber(entity_json, "shadow_bias", light->shadow_bias);
+				break;
+			}
+		}
+
+	}
+
+	//JSON file
+	ofstream json_file("data/scene.json", ofstream::binary);
+
+	//Delete the old JSON
+	json_file.clear();
+
+	//Save the new JSON
+	int json_size = 0;
+	char* json_content = cJSON_Print(json,&json_size);
+	json_file.write(json_content,json_size);
+
+	//Notify the success
+	cout << "Scene successfully saved" << endl;
 
 	return true;
 }

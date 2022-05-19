@@ -121,6 +121,11 @@ bool readFile(const std::string& filename, std::string& content)
 	return true;
 }
 
+bool writeJSON(const std::string& filename, cJSON* json)
+{
+
+}
+
 bool readFileBin(const std::string& filename, std::vector<unsigned char>& buffer)
 {
 	buffer.clear();
@@ -574,4 +579,38 @@ Vector4 readJSONVector4(cJSON* obj, const char* name)
 			return Vector4(dst[0], dst[1], dst[2], dst[3]);
 	}
 	return Vector4();
+}
+
+void replaceJSONBoolean(cJSON* obj, const char* name, bool boolean)
+{
+	cJSON* new_item = cJSON_CreateBool(boolean);
+	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
+}
+
+void replaceJSONNumber(cJSON* obj, const char* name, float number)
+{
+
+	cJSON* new_item = cJSON_CreateNumber(number);
+	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
+
+}
+
+void replaceJSONString(cJSON* obj, const char* name, const char* string) 
+{
+	cJSON* new_item = cJSON_CreateString(string);
+	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
+}
+
+void replaceJSONVector3(cJSON* obj, const char* name, Vector3 vector)
+{
+	const float new_array[3] = { vector.x,vector.y,vector.z };
+	cJSON* new_item = cJSON_CreateFloatArray(new_array,3);
+	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
+}
+
+void replaceJSONVector4(cJSON* obj, const char* name, Vector4 vector)
+{
+	const float new_array[4] = { vector.x,vector.y,vector.z, vector.w};
+	cJSON* new_item = cJSON_CreateFloatArray(new_array, 4);
+	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
 }

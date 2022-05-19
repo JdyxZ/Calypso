@@ -306,6 +306,11 @@ Vector3 Matrix44::getTranslation()
 	return Vector3(m[12],m[13],m[14]);
 }
 
+Vector3 Matrix44::getScale()
+{
+	return Vector3(m[0], m[5], m[10]);
+}
+
 //To create a rotation matrix
 void Matrix44::setRotation( float angle_in_rad, const Vector3& axis  )
 {

@@ -58,20 +58,18 @@ Application::Application(int window_width, int window_height, SDL_Window* window
         exit(1);
     checkGLErrors();
 
-
 	// Create camera
 	camera = new Camera();
 	camera->lookAt(Vector3(-150.f, 150.0f, 250.f), Vector3(0.f, 0.0f, 0.f), Vector3(0.f, 1.f, 0.f));
 	camera->setPerspective( 45.f, window_width/(float)window_height, 1.0f, 10000.f);
 
-	//Scene creationg and json loading
+	//Create the scene and bind the main camera
 	scene = new GTR::Scene();
+	scene->main_camera = camera;
+
+	//Load the JSON
 	if (!scene->load("data/scene.json"))
 		exit(1);
-
-	//Set camera parameters of the scene
-	camera->lookAt(scene->main_camera.eye, scene->main_camera.center, Vector3(0, 1, 0));
-	camera->fov = scene->main_camera.fov;
 
 	//This class will be the one in charge of rendering all 
 	renderer = new GTR::Renderer(); //here so we have opengl ready in constructor
@@ -275,7 +273,7 @@ void Application::renderDebugGUI(void)
 	}
 
 	//Scene Color
-	ImGui::ColorEdit3("BG color", scene->background_color.v);
+	ImGui::ColorEdit3("Background color", scene->background_color.v);
 	ImGui::ColorEdit3("Ambient Light", scene->ambient_light.v);
 
 	//add info to the debug panel about the camera
@@ -323,8 +321,8 @@ void Application::onKeyDown( SDL_KeyboardEvent event )
 		case SDLK_F6:
 			scene->clear();
 			scene->load(scene->filename.c_str());
-			camera->lookAt(scene->main_camera.eye, scene->main_camera.center, Vector3(0, 1, 0));
-			camera->fov = scene->main_camera.fov;
+			camera->lookAt(Vector3(-150.f, 150.0f, 250.f), Vector3(0.f, 0.0f, 0.f), Vector3(0.f, 1.f, 0.f));
+			camera->setPerspective(45.f, window_width / (float)window_height, 1.0f, 10000.f);
 			camera->camera_tracker = true;
 			break;
 		case SDLK_LEFT:
@@ -333,6 +331,8 @@ void Application::onKeyDown( SDL_KeyboardEvent event )
 		case SDLK_RIGHT:
 			scene->atlas_scope++;
 			break;
+		case SDLK_g:
+			scene->save("data/scene.json");
 	}
 }
 
