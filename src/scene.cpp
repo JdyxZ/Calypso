@@ -32,9 +32,9 @@ GTR::Scene::Scene()
 	show_atlas = false;
 	atlas_scope = 0;
 
-	//Scene trackers: We set them true just for the first iteration
-	entity_tracker = true;
-	shadow_visibility_tracker = true;
+	//Scene triggers: We set them true just for the first iteration
+	entity_trigger = true;
+	shadow_visibility_trigger = true;
 	
 }
 
@@ -125,12 +125,9 @@ bool GTR::Scene::load(const char* filename)
 	return true;
 }
 
-bool GTR::Scene::save(const char* filename)
+bool GTR::Scene::save()
 {
 	std::string content;
-
-	this->filename = filename;
-	std::cout << " + Reading scene JSON: " << filename << "..." << std::endl;
 
 	if (!readFile(filename, content))
 	{
@@ -202,7 +199,7 @@ bool GTR::Scene::save(const char* filename)
 	json_file.write(json_content,json_size);
 
 	//Notify the success
-	cout << "Scene successfully saved" << endl;
+	cout << endl << "Scene successfully saved" << endl;
 
 	return true;
 }
@@ -228,9 +225,9 @@ void GTR::BaseEntity::renderInMenu()
 	if (this->entity_type == LIGHT && visibility_changed)
 	{
 		LightEntity* light = (LightEntity*)this;
-		if(light->cast_shadows)	scene->shadow_visibility_tracker = true;
+		if(light->cast_shadows)	scene->shadow_visibility_trigger = true;
 	}
-	if (this->entity_type == PREFAB && visibility_changed) scene->entity_tracker = true;
+	if (this->entity_type == PREFAB && visibility_changed) scene->entity_trigger = true;
 #endif
 }
 
@@ -274,12 +271,12 @@ GTR::LightEntity::LightEntity()
 	//Spot light
 	cone_angle = 45;
 	cone_exp = 30;
-	spot_shadow_tracker = true;
+	spot_shadow_trigger = true;
 
 	
 	//Directional light
 	area_size = 1000;
-	directional_shadow_tracker = true;
+	directional_shadow_trigger = true;
 
 	//Shadows
 	cast_shadows = false;
@@ -301,11 +298,11 @@ void GTR::LightEntity::renderInMenu()
 			ImGui::Text("Light type: %s", "Spot"); 
 			ImGui::ColorEdit3("Color", color.v);
 			ImGui::DragFloat("Intensity", &intensity, 0.1f);
-			spot_shadow_tracker |= ImGui::DragFloat("Max distance", &max_distance, 1);
-			spot_shadow_tracker |= ImGui::DragFloat("Cone angle", &cone_angle);
+			spot_shadow_trigger |= ImGui::DragFloat("Max distance", &max_distance, 1);
+			spot_shadow_trigger |= ImGui::DragFloat("Cone angle", &cone_angle);
 			ImGui::DragFloat("Cone exponent", &cone_exp);
-			scene->shadow_visibility_tracker |= ImGui::Checkbox("Cast shadow", &cast_shadows);
-			spot_shadow_tracker |= ImGui::DragFloat("Shadow bias", &shadow_bias, 0.001f);
+			scene->shadow_visibility_trigger |= ImGui::Checkbox("Cast shadow", &cast_shadows);
+			spot_shadow_trigger |= ImGui::DragFloat("Shadow bias", &shadow_bias, 0.001f);
 			break;
 		case eLightType::POINT:
 			ImGui::Text("Light type: %s", "Point");
@@ -317,10 +314,10 @@ void GTR::LightEntity::renderInMenu()
 			ImGui::Text("Light type: %s", "Directional");
 			ImGui::ColorEdit3("Color", color.v);
 			ImGui::DragFloat("Intensity", &intensity, 0.1f);
-			directional_shadow_tracker |= ImGui::DragFloat("Max distance", &max_distance, 1);
-			directional_shadow_tracker |= ImGui::DragFloat("Area size", &area_size);
-			scene->shadow_visibility_tracker |= ImGui::Checkbox("Cast shadow", &cast_shadows);
-			directional_shadow_tracker |= ImGui::DragFloat("Shadow bias", &shadow_bias, 0.001f);
+			directional_shadow_trigger |= ImGui::DragFloat("Max distance", &max_distance, 1);
+			directional_shadow_trigger |= ImGui::DragFloat("Area size", &area_size);
+			scene->shadow_visibility_trigger |= ImGui::Checkbox("Cast shadow", &cast_shadows);
+			directional_shadow_trigger |= ImGui::DragFloat("Shadow bias", &shadow_bias, 0.001f);
 			break;
 	}
 

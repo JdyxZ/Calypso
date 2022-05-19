@@ -85,7 +85,7 @@ void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
 	if (scene->shadow_sorting) std::sort(lights.begin(), lights.end(), sortLight);
 
 	//Set shadow resolution
-	if (scene->shadow_resolution_tracker)
+	if (scene->shadow_resolution_trigger)
 	{
 		string shadow_resolution;
 		shadow_resolution.assign(Application::instance->shadow_resolutions[scene->atlas_resolution_index]);
@@ -94,7 +94,7 @@ void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
 	}
 
 	//Compute the number of shadows of the scene and the shadow index of each light
-	if (scene->shadow_visibility_tracker)
+	if (scene->shadow_visibility_trigger)
 	{
 		scene->num_shadows = 0;
 		int shadow_index = 0;
@@ -113,7 +113,7 @@ void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
 	}
 
 	//Create Shadow Atlas: We create a dynamic atlas to be resizable
-	if (scene->shadow_visibility_tracker || scene->shadow_resolution_tracker) createShadowAtlas();
+	if (scene->shadow_visibility_trigger || scene->shadow_resolution_trigger) createShadowAtlas();
 
 	//Compute Shadow Atlas
 	if (scene->fbo || scene->shadow_atlas)
@@ -125,19 +125,19 @@ void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
 			LightEntity* light = lights[i];
 
 			//Booleans
-			bool compute_spot = light->light_type == SPOT && light->cast_shadows && (scene->entity_tracker || light->spot_shadow_tracker || scene->shadow_visibility_tracker || scene->shadow_resolution_tracker);
-			bool compute_directional = light->light_type == DIRECTIONAL && light->cast_shadows && (scene->entity_tracker || light->directional_shadow_tracker || scene->shadow_visibility_tracker || scene->shadow_resolution_tracker || camera->camera_tracker);
+			bool compute_spot = light->light_type == SPOT && light->cast_shadows && (scene->entity_trigger || light->spot_shadow_trigger || scene->shadow_visibility_trigger || scene->shadow_resolution_trigger);
+			bool compute_directional = light->light_type == DIRECTIONAL && light->cast_shadows && (scene->entity_trigger || light->directional_shadow_trigger || scene->shadow_visibility_trigger || scene->shadow_resolution_trigger || camera->camera_trigger);
 			
 			//Shadow Map
 			if (compute_spot)
 			{
 				computeSpotShadowMap(light);
-				light->spot_shadow_tracker = false;
+				light->spot_shadow_trigger = false;
 			}
 			if (compute_directional)
 			{
 				computeDirectionalShadowMap(light,camera);
-				light->directional_shadow_tracker = false;
+				light->directional_shadow_trigger = false;
 			}
 		}
 	}
@@ -159,10 +159,10 @@ void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
 	//Debug shadow maps
 	if (scene->show_atlas) showShadowAtlas();
 
-	//Reset trackers
-	if (scene->entity_tracker) scene->entity_tracker = false;
-	if (scene->shadow_visibility_tracker) scene->shadow_visibility_tracker = false;
-	if (camera->camera_tracker) camera->camera_tracker = false;
+	//Reset triggers
+	if (scene->entity_trigger) scene->entity_trigger = false;
+	if (scene->shadow_visibility_trigger) scene->shadow_visibility_trigger = false;
+	if (camera->camera_trigger) camera->camera_trigger = false;
 
 }
 

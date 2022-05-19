@@ -77,11 +77,11 @@ namespace GTR {
 		//Spot Light
 		float cone_angle;
 		float cone_exp;
-		bool spot_shadow_tracker;// Tracks changes in spotlight properties that affect shadows for atlas rebuilding task.
+		bool spot_shadow_trigger;// Triggers changes in spotlight properties that affect shadows for atlas rebuilding task.
 
 		//Directional Light
 		float area_size; 
-		bool directional_shadow_tracker;// Tracks changes in spotlight properties that affect shadows for atlas rebuilding task.
+		bool directional_shadow_trigger;// Triggers changes in spotlight properties that affect shadows for atlas rebuilding task.
 
 		//Shadows
 		bool cast_shadows;
@@ -123,10 +123,10 @@ namespace GTR {
 		int atlas_scope; //The current shadow scope in case that all shadow maps doesn't fit into the screen.
 		bool show_atlas; //Enables or disables the display of the shadow atlas.
 
-		//Scene trackers
-		bool entity_tracker; //Tracks if an entity has changed his visibility or a visible entity has changed its model.
-		bool shadow_visibility_tracker; //Tracks changes in shadow casting or light visibility for lights that cast shadows.
-		bool shadow_resolution_tracker; //Tracks if shadow resolution has been changed.
+		//Scene triggers
+		bool entity_trigger; //Triggers if an entity has changed his visibility or a visible entity has changed its model.
+		bool shadow_visibility_trigger; //Triggers changes in shadow casting or light visibility for lights that cast shadows.
+		bool shadow_resolution_trigger; //Triggers if shadow resolution has been changed.
 
 		Scene();
 
@@ -139,7 +139,7 @@ namespace GTR {
 
 		//JSON methods
 		bool load(const char* filename);
-		bool save(const char* filename);
+		bool save();
 	};
 
 };

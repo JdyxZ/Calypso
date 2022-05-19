@@ -40,8 +40,8 @@ public:
 	Matrix44 projection_matrix;
 	Matrix44 viewprojection_matrix;
 
-	//Camera tracker
-	bool camera_tracker;//Tracks if camera has moved in the space.
+	//Camera trigger
+	bool camera_trigger;//Triggers camera motion over the space.
 
 	Camera();
 

@@ -11,8 +11,8 @@ Camera::Camera()
 	lookAt( Vector3(0, 0, 0), Vector3(0, 0, -1), Vector3(0, 1, 0) );
 	setOrthographic(-100,100,-100, 100,-100,100);
 
-	//Camera tracker
-	camera_tracker = false;
+	//Camera trigger
+	camera_trigger = false;
 }
 
 void Camera::enable()
@@ -357,7 +357,7 @@ void Camera::renderInMenu()
 		changed |= ImGui::SliderFloat("Far", &far_plane, near_plane, 10000);
 		if (changed)
 			this->lookAt(eye, center, up);
-			camera_tracker = true;
+			camera_trigger = true;
 	#endif
 }
 

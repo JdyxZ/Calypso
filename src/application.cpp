@@ -132,7 +132,7 @@ void Application::update(double seconds_elapsed)
 			camera->rotate(-Input::mouse_delta.x * orbit_speed * 0.5, Vector3(0, 1, 0));
 			Vector3 right = camera->getLocalVector(Vector3(1, 0, 0));
 			camera->rotate(-Input::mouse_delta.y * orbit_speed * 0.5, right);
-			camera->camera_tracker = true;
+			camera->camera_trigger = true;
 		}
 		else //orbit around center
 		{
@@ -143,20 +143,20 @@ void Application::update(double seconds_elapsed)
 			if (Input::mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT) && !mouse_blocked) //is left button pressed?
 			{
 				camera->orbit(-Input::mouse_delta.x * orbit_speed, Input::mouse_delta.y * orbit_speed);
-				camera->camera_tracker = true;
+				camera->camera_trigger = true;
 			}
 		}
 	}
 
 	//Move camera using WASD controls
-	if (Input::isKeyPressed(SDL_SCANCODE_W)) camera->move(Vector3(0.0f, 0.0f, 1.0f) * speed), camera->camera_tracker = true;
-	if (Input::isKeyPressed(SDL_SCANCODE_S)) camera->move(Vector3(0.0f, 0.0f, -1.0f) * speed), camera->camera_tracker = true;
-	if (Input::isKeyPressed(SDL_SCANCODE_A)) camera->move(Vector3(1.0f, 0.0f, 0.0f) * speed), camera->camera_tracker = true;
-	if (Input::isKeyPressed(SDL_SCANCODE_D)) camera->move(Vector3(-1.0f, 0.0f, 0.0f) * speed), camera->camera_tracker = true;
+	if (Input::isKeyPressed(SDL_SCANCODE_W)) camera->move(Vector3(0.0f, 0.0f, 1.0f) * speed), camera->camera_trigger = true;
+	if (Input::isKeyPressed(SDL_SCANCODE_S)) camera->move(Vector3(0.0f, 0.0f, -1.0f) * speed), camera->camera_trigger = true;
+	if (Input::isKeyPressed(SDL_SCANCODE_A)) camera->move(Vector3(1.0f, 0.0f, 0.0f) * speed), camera->camera_trigger = true;
+	if (Input::isKeyPressed(SDL_SCANCODE_D)) camera->move(Vector3(-1.0f, 0.0f, 0.0f) * speed), camera->camera_trigger = true;
 	
 	//Move up or down the camera using Q and E
-	if (Input::isKeyPressed(SDL_SCANCODE_Q)) camera->moveGlobal(Vector3(0.0f, -1.0f, 0.0f) * speed), camera->camera_tracker = true;
-	if (Input::isKeyPressed(SDL_SCANCODE_E)) camera->moveGlobal(Vector3(0.0f, 1.0f, 0.0f) * speed), camera->camera_tracker = true;
+	if (Input::isKeyPressed(SDL_SCANCODE_Q)) camera->moveGlobal(Vector3(0.0f, -1.0f, 0.0f) * speed), camera->camera_trigger = true;
+	if (Input::isKeyPressed(SDL_SCANCODE_E)) camera->moveGlobal(Vector3(0.0f, 1.0f, 0.0f) * speed), camera->camera_trigger = true;
 
 	//to navigate with the mouse fixed in the middle
 	SDL_ShowCursor(!mouse_locked);
@@ -237,7 +237,7 @@ void Application::renderDebugGizmo()
 	ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
 	if(selected_entity->visible)
-		ImGuizmo::Manipulate(camera->view_matrix.m, camera->projection_matrix.m, mCurrentGizmoOperation, mCurrentGizmoMode, matrix.m, NULL, useSnap ? &snap.x : NULL, 0,0, &scene->entity_tracker);
+		ImGuizmo::Manipulate(camera->view_matrix.m, camera->projection_matrix.m, mCurrentGizmoOperation, mCurrentGizmoMode, matrix.m, NULL, useSnap ? &snap.x : NULL, 0,0, &scene->entity_trigger);
 	else
 		ImGuizmo::Manipulate(camera->view_matrix.m, camera->projection_matrix.m, mCurrentGizmoOperation, mCurrentGizmoMode, matrix.m, NULL, useSnap ? &snap.x : NULL, 0, 0);
 
@@ -264,7 +264,7 @@ void Application::renderDebugGUI(void)
 	ImGui::Checkbox("Shadow sorting", &scene->shadow_sorting);
 
 	//Shadow resolution
-	scene->shadow_resolution_tracker = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, shadow_resolutions, IM_ARRAYSIZE(shadow_resolutions));
+	scene->shadow_resolution_trigger = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, shadow_resolutions, IM_ARRAYSIZE(shadow_resolutions));
 
 	//Render type
 	switch (scene->render_type) {
@@ -316,14 +316,14 @@ void Application::onKeyDown( SDL_KeyboardEvent event )
 	{
 		case SDLK_ESCAPE: must_exit = true; break; //ESC key, kill the app
 		case SDLK_F1: render_debug = !render_debug; break;
-		case SDLK_f: camera->center.set(0, 0, 0); camera->updateViewMatrix(); camera->camera_tracker = true; break;
+		case SDLK_f: camera->center.set(0, 0, 0); camera->updateViewMatrix(); camera->camera_trigger = true; break;
 		case SDLK_F5: Shader::ReloadAll(); break;
 		case SDLK_F6:
 			scene->clear();
 			scene->load(scene->filename.c_str());
 			camera->lookAt(Vector3(-150.f, 150.0f, 250.f), Vector3(0.f, 0.0f, 0.f), Vector3(0.f, 1.f, 0.f));
 			camera->setPerspective(45.f, window_width / (float)window_height, 1.0f, 10000.f);
-			camera->camera_tracker = true;
+			camera->camera_trigger = true;
 			break;
 		case SDLK_LEFT:
 			scene->atlas_scope--;
@@ -332,7 +332,7 @@ void Application::onKeyDown( SDL_KeyboardEvent event )
 			scene->atlas_scope++;
 			break;
 		case SDLK_g:
-			scene->save("data/scene.json");
+			scene->save();
 	}
 }
 
