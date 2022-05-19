@@ -101,52 +101,19 @@ bool GTR::Scene::load(const char* filename)
 
 		addEntity(ent);
 
+		//Entity name
 		if (cJSON_GetObjectItem(entity_json, "name"))
 		{
 			ent->name = cJSON_GetObjectItem(entity_json, "name")->valuestring;
 			stdlog(std::string(" + entity: ") + ent->name);
 		}
 
-		//read transform
-		if (cJSON_GetObjectItem(entity_json, "position"))
+		//Entity model
+		if (cJSON_GetObjectItem(entity_json, "model"))
 		{
-			ent->model.setIdentity();
-			Vector3 position = readJSONVector3(entity_json, "position", Vector3());
-			ent->model.translate(position.x, position.y, position.z);
-		}
-
-		if (cJSON_GetObjectItem(entity_json, "angle"))
-		{
-			float angle = cJSON_GetObjectItem(entity_json, "angle")->valuedouble;
-			ent->model.rotate(angle * DEG2RAD, Vector3(0, 1, 0));
-		}
-
-		if (cJSON_GetObjectItem(entity_json, "rotation"))
-		{
-			Vector4 rotation = readJSONVector4(entity_json, "rotation");
-			Quaternion q(rotation.x, rotation.y, rotation.z, rotation.w);
-			Matrix44 R;
-			q.toMatrix(R);
-			ent->model = R * ent->model;
-		}
-
-		if (cJSON_GetObjectItem(entity_json, "target"))
-		{
-			Vector3 target = readJSONVector3(entity_json, "target", Vector3());
-			Vector3 front = target - ent->model.getTranslation();
-			ent->model.setFrontAndOrthonormalize(front);
-		}
-
-		if (cJSON_GetObjectItem(entity_json, "scale"))
-		{
-			Vector3 scale = readJSONVector3(entity_json, "scale", Vector3(1, 1, 1));
-			ent->model.scale(scale.x, scale.y, scale.z);
-		}
-		if (cJSON_GetObjectItem(entity_json, "custom_rotation"))
-		{
-			//Hardcoded
-			ent->model.rotate(-270 * DEG2RAD, Vector3(0, 1, 0));
-			ent->model.rotate(90 * DEG2RAD, Vector3(1, 0, 1));
+			vector<float> model_array;
+			readJSONVector(entity_json, "model", model_array);
+			for(int i = 0; i < model_array.size(); ++i)	ent->model.m[i] = model_array[i];
 		}
 
 		ent->configure(entity_json);
@@ -202,14 +169,12 @@ bool GTR::Scene::save(const char* filename)
 			case (PREFAB):
 			{
 				PrefabEntity* prefab = (PrefabEntity*)entity;
-				if (cJSON_GetObjectItem(entity_json, "position")) replaceJSONVector3(entity_json, "position", prefab->model.getTranslation());
-				if (cJSON_GetObjectItem(entity_json, "scale")) replaceJSONVector3(entity_json, "scale", prefab->model.getScale());
+				if (cJSON_GetObjectItem(entity_json, "model")) replaceJSONFloatVector(entity_json, "model", prefab->model.m, 16);
 				break;
 			}
 			case (LIGHT):
 			{
 				LightEntity* light = (LightEntity*)entity;
-				if (cJSON_GetObjectItem(entity_json, "position")) replaceJSONVector3(entity_json, "position", light->model.getTranslation());
 				if (cJSON_GetObjectItem(entity_json, "color")) replaceJSONVector3(entity_json, "color", light->color);
 				if (cJSON_GetObjectItem(entity_json, "intensity")) replaceJSONNumber(entity_json, "intensity", light->intensity);
 				if (cJSON_GetObjectItem(entity_json, "max_dist")) replaceJSONNumber(entity_json, "max_dist", light->max_distance);
@@ -218,6 +183,7 @@ bool GTR::Scene::save(const char* filename)
 				if (cJSON_GetObjectItem(entity_json, "area_size")) replaceJSONNumber(entity_json, "area_size", light->area_size);
 				if (cJSON_GetObjectItem(entity_json, "cast_shadows")) replaceJSONBoolean(entity_json, "cast_shadows", light->cast_shadows);
 				if (cJSON_GetObjectItem(entity_json, "shadow_bias")) replaceJSONNumber(entity_json, "shadow_bias", light->shadow_bias);
+				if (cJSON_GetObjectItem(entity_json, "model")) replaceJSONFloatVector(entity_json, "model", light->model.m, 16);
 				break;
 			}
 		}

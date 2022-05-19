@@ -121,11 +121,6 @@ bool readFile(const std::string& filename, std::string& content)
 	return true;
 }
 
-bool writeJSON(const std::string& filename, cJSON* json)
-{
-
-}
-
 bool readFileBin(const std::string& filename, std::vector<unsigned char>& buffer)
 {
 	buffer.clear();
@@ -598,6 +593,12 @@ void replaceJSONNumber(cJSON* obj, const char* name, float number)
 void replaceJSONString(cJSON* obj, const char* name, const char* string) 
 {
 	cJSON* new_item = cJSON_CreateString(string);
+	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
+}
+
+void replaceJSONFloatVector(cJSON* obj, const char* name, float* vector, int size)
+{
+	cJSON* new_item = cJSON_CreateFloatArray(vector, size);
 	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
 }
 

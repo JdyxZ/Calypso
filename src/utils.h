@@ -68,6 +68,7 @@ Vector4 readJSONVector4(cJSON* obj, const char* name);
 void replaceJSONBoolean(cJSON* obj, const char* name, bool boolean);
 void replaceJSONNumber(cJSON* obj, const char* name, float number);
 void replaceJSONString(cJSON* obj, const char* name, const char* string);
+void replaceJSONFloatVector(cJSON* obj, const char* name, float* vector, int size);
 void replaceJSONVector3(cJSON* obj, const char* name, Vector3 vector);
 void replaceJSONVector4(cJSON* obj, const char* name, Vector4 vector);
 
