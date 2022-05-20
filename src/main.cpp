@@ -109,6 +109,12 @@ void renderDebug(SDL_Window* window, Application * app)
 			app->renderDebugGUI();
 		ImGui::End();
 	}
+	if (app->render_editor)
+	{
+		if (ImGui::Begin("Entity Creator"))
+			app->renderEntityEditor();
+		ImGui::End();
+	}
 
 	// Rendering
 	ImGui::EndFrame();

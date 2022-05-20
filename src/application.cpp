@@ -41,10 +41,9 @@ Application::Application(int window_width, int window_height, SDL_Window* window
 	render_debug = true;
 	render_grid = false;
 	render_gui = true;
-	render_editor = true;
+	render_editor = false;
 	render_wireframe = false;
 
-	current_entity_type = 0;
 	fps = 0;
 	frame = 0;
 	time = 0.0f;
@@ -53,15 +52,19 @@ Application::Application(int window_width, int window_height, SDL_Window* window
 
 	//Compute assets vector
 	string prefabs_path = filesystem::current_path().string() + "\\data\\prefabs";
-	vector<string> tmp;
-	int assets_size = 0;
 	for (const auto& entry : filesystem::directory_iterator(prefabs_path))
 	{
 		string str_path = entry.path().string();
 		string asset = str_path.substr(prefabs_path.size() + 1, str_path.size());
-		assets_size += asset.size();
-		tmp.push_back(asset);
+		assets.push_back(asset);
 	};
+
+	//Entity creator
+	current_entity_type = 0;
+	if (assets.size()) current_asset = assets[0].c_str();
+	else current_asset = NULL;
+	current_light_type = 0;
+
 
 	//loads and compiles several shaders from one single file
     //change to "data/shader_atlas_osx.txt" if you are in XCODE
@@ -269,6 +272,7 @@ void Application::renderDebugGUI(void)
 	ImGui::Text(getGPUStats().c_str());					   // Display some text (you can use a format strings too)
 
 	//Scene algorithms
+	ImGui::Checkbox("Entity creator", &render_editor);
 	ImGui::Checkbox("Wireframe", &render_wireframe);
 	ImGui::Checkbox("Grid", &render_grid);
 	ImGui::Checkbox("Alpha sorting", &scene->alpha_sorting);
@@ -333,11 +337,46 @@ void Application::renderEntityEditor()
 	ImGui::Combo("Entity type", &current_entity_type, entity_types, IM_ARRAYSIZE(entity_types));
 	
 	//Entity features
-	switch (current_entity_type) {
-	case(0):
-		ImGui::Combo("Assets", &current_entity_type, entity_types, IM_ARRAYSIZE(entity_types));
-	case(1):
-		ImGui::Combo("Light type", &current_entity_type, entity_types, IM_ARRAYSIZE(entity_types));
+	if (current_entity_type)
+	{
+		ImGui::Combo("Light type", &current_light_type, light_types, IM_ARRAYSIZE(light_types));
+		bool create_light = ImGui::Button("Create");
+
+		if (create_light)
+		{
+			GTR::LightEntity* new_light = new GTR::LightEntity(GTR::eLightType(current_light_type));
+			new_light->model.translate(camera->center.x, camera->center.y, camera->center.z);
+			if (new_light->light_type == GTR::eLightType::POINT) new_light->name = scene->nameEntity(string("point light"));
+			else if (new_light->light_type == GTR::eLightType::SPOT) new_light->name = scene->nameEntity(string("spotlight"));
+			else if (new_light->light_type == GTR::eLightType::DIRECTIONAL) new_light->name = scene->nameEntity(string("directional light"));
+			scene->addEntity(new_light);
+		}
+	}
+	else
+	{
+
+		if (ImGui::BeginCombo("Assets", current_asset))
+		{
+			for (int i = 0; i < assets.size(); ++i)
+			{
+				bool is_selected = (current_asset == assets[i].c_str());
+				if (ImGui::Selectable(assets[i].c_str(), is_selected))
+					current_asset = assets[i].c_str();
+				if (is_selected)
+					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+
+		bool create_prefab = ImGui::Button("Create");
+
+		if (create_prefab && current_asset)
+		{
+			GTR::PrefabEntity* new_prefab = new GTR::PrefabEntity("prefabs/" + string(current_asset) + "/scene.gltf");
+			new_prefab->model.translate(camera->center.x, camera->center.y, camera->center.z);
+			new_prefab->name = scene->nameEntity(string(current_asset));
+			scene->addEntity(new_prefab);
+		}
 	}
 
 #endif

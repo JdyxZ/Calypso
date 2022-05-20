@@ -53,6 +53,20 @@ void GTR::Scene::addEntity(BaseEntity* entity)
 	entities.push_back(entity); entity->scene = this;
 }
 
+std::string GTR::Scene::nameEntity(string default_name)
+{
+
+	bool simple_name = true;
+	int name_index = 1;
+	for (int i = 0; i < entities.size(); ++i)
+	{
+		if (entities[i]->name == default_name) simple_name = false;
+		if (entities[i]->name == (default_name + " " + to_string(name_index))) name_index++;
+	}
+	if (simple_name) return default_name;
+	else return default_name + " " + to_string(name_index);
+}
+
 bool GTR::Scene::load(const char* filename)
 {
 	std::string content;
@@ -131,59 +145,93 @@ bool GTR::Scene::save()
 
 	if (!readFile(filename, content))
 	{
-		std::cout << "- ERROR: Scene file not found: " << filename << std::endl;
+		cout << "ERROR: Scene file not found: " << filename << endl;
 		return false;
 	}
 
-	//Parse JSON string
-	cJSON* json = cJSON_Parse(content.c_str());
-	if (!json)
-	{
-		std::cout << "ERROR: Scene JSON has errors: " << filename << std::endl;
-		return false;
-	}
+	//Create JSON
+	cJSON* scene_json = cJSON_CreateObject();
 
-	//Replace global properties
-	replaceJSONVector3(json, "background_color", background_color);
-	replaceJSONVector3(json, "ambient_light", ambient_light);
-	replaceJSONVector3(json, "camera_position", main_camera->eye);
-	replaceJSONVector3(json, "camera_target", main_camera->center);
-	replaceJSONNumber(json, "camera_fov", 80);
+	//Create scene properties vectors
+	const float background_color[3] = {this->background_color.x, this->background_color.y, this->background_color.z};
+	const float ambient_light[3] = {this->ambient_light.x, this->ambient_light.y, this->ambient_light.z};
+	const float camera_position[3] = { -300, 88.4000015258789, -150 };
+	const float camera_target[3] = {0, 0, 0};
 
-	//Entities
-	cJSON* entities_json = cJSON_GetObjectItemCaseSensitive(json, "entities");
+	//Create scene properties JSONs
+	cJSON* scene_bg_color = cJSON_CreateFloatArray(background_color, 3);
+	cJSON* scene_ambient_light = cJSON_CreateFloatArray(ambient_light, 3);
+	cJSON* scene_camera_position = cJSON_CreateFloatArray(camera_position, 3);
+	cJSON* scene_camera_target = cJSON_CreateFloatArray(camera_target, 3);
+
+	//Add scene properties
+	cJSON_AddStringToObject(scene_json, "environment", "night.hdre");
+	cJSON_AddItemToObject(scene_json, "background_color", scene_bg_color);
+	cJSON_AddItemToObject(scene_json, "ambient_light", scene_ambient_light);
+	cJSON_AddItemToObject(scene_json, "camera_position", scene_camera_position);
+	cJSON_AddItemToObject(scene_json, "camera_target", scene_camera_target);
+	cJSON_AddNumberToObject(scene_json, "camera_fov", 80);
+
+	//Entitiy JSON
+	cJSON* entities_json = cJSON_AddArrayToObject(scene_json, "entities");
+	cJSON* new_entity = cJSON_CreateObject();
 
 	for (int i = 0; i < entities.size(); ++i)
 	{
 		BaseEntity* entity = entities[i];
-		cJSON* entity_json = cJSON_GetArrayItem(entities_json, i);
 
-		if (readJSONString(entity_json, "name", "") != entities[i]->name)
-			continue;
+		//Create the new entity JSON
+		cJSON* new_entity = cJSON_CreateObject();
 
 		switch (entity->entity_type)
 		{
 			case (PREFAB):
 			{
 				PrefabEntity* prefab = (PrefabEntity*)entity;
-				if (cJSON_GetObjectItem(entity_json, "model")) replaceJSONFloatVector(entity_json, "model", prefab->model.m, 16);
+				cJSON* entity_model = cJSON_CreateFloatArray(prefab->model.m, 16);
+				cJSON_AddStringToObject(new_entity, "name", prefab->name.c_str());
+				cJSON_AddStringToObject(new_entity, "type", "PREFAB");
+				cJSON_AddStringToObject(new_entity, "filename", prefab->filename.c_str());
+				cJSON_AddItemToObject(new_entity, "model", entity_model);
 				break;
 			}
 			case (LIGHT):
 			{
 				LightEntity* light = (LightEntity*)entity;
-				if (cJSON_GetObjectItem(entity_json, "color")) replaceJSONVector3(entity_json, "color", light->color);
-				if (cJSON_GetObjectItem(entity_json, "intensity")) replaceJSONNumber(entity_json, "intensity", light->intensity);
-				if (cJSON_GetObjectItem(entity_json, "max_dist")) replaceJSONNumber(entity_json, "max_dist", light->max_distance);
-				if (cJSON_GetObjectItem(entity_json, "cone_angle")) replaceJSONNumber(entity_json, "cone_angle", light->cone_angle);
-				if (cJSON_GetObjectItem(entity_json, "cone_exp")) replaceJSONNumber(entity_json, "cone_exp", light->cone_exp);
-				if (cJSON_GetObjectItem(entity_json, "area_size")) replaceJSONNumber(entity_json, "area_size", light->area_size);
-				if (cJSON_GetObjectItem(entity_json, "cast_shadows")) replaceJSONBoolean(entity_json, "cast_shadows", light->cast_shadows);
-				if (cJSON_GetObjectItem(entity_json, "shadow_bias")) replaceJSONNumber(entity_json, "shadow_bias", light->shadow_bias);
-				if (cJSON_GetObjectItem(entity_json, "model")) replaceJSONFloatVector(entity_json, "model", light->model.m, 16);
+				const float light_color[3] = { light->color.x,light->color.y, light->color.z };
+				cJSON* entity_color = cJSON_CreateFloatArray(light_color, 3);
+				cJSON* entity_model = cJSON_CreateFloatArray(light->model.m, 16);
+				cJSON_AddStringToObject(new_entity, "name", light->name.c_str());
+				cJSON_AddStringToObject(new_entity, "type", "LIGHT");
+				cJSON_AddItemToObject(new_entity, "color", entity_color);
+				cJSON_AddNumberToObject(new_entity, "intensity", light->intensity);
+				cJSON_AddNumberToObject(new_entity, "max_dist", light->max_distance);
+				switch (light->light_type) 
+				{
+				case(eLightType::POINT):
+					cJSON_AddStringToObject(new_entity, "light_type", "POINT");
+					break;
+				case(eLightType::SPOT):
+					cJSON_AddNumberToObject(new_entity, "cone_angle", light->cone_angle);
+					cJSON_AddNumberToObject(new_entity, "cone_exp", light->cone_exp);
+					cJSON_AddBoolToObject(new_entity, "cast_shadows", light->cast_shadows);
+					cJSON_AddNumberToObject(new_entity, "shadow_bias", light->shadow_bias);
+					cJSON_AddStringToObject(new_entity, "light_type", "SPOT");
+					break;
+				case(eLightType::DIRECTIONAL):
+					cJSON_AddNumberToObject(new_entity, "area_size", light->area_size);
+					cJSON_AddBoolToObject(new_entity, "cast_shadows", light->cast_shadows);
+					cJSON_AddStringToObject(new_entity, "light_type", "DIRECTIONAL");
+					break;
+				}
+				cJSON_AddItemToObject(new_entity, "model", entity_model);
+
 				break;
 			}
 		}
+		
+		//Add the new entity to the list of entities
+		cJSON_AddItemToArray(entities_json, new_entity);
 
 	}
 
@@ -195,14 +243,14 @@ bool GTR::Scene::save()
 
 	//Save the new JSON
 	int json_size = 0;
-	char* json_content = cJSON_Print(json,&json_size);
+	char* json_content = cJSON_Print(scene_json,&json_size);
 	json_file.write(json_content,json_size);
 
 	//Notify the success
 	cout << endl << "Scene successfully saved" << endl;
 
 	//Free memory
-	cJSON_Delete(json);
+	cJSON_Delete(scene_json);
 
 	return true;
 }
@@ -238,6 +286,15 @@ GTR::PrefabEntity::PrefabEntity()
 {
 	entity_type = PREFAB;
 	prefab = NULL;
+}
+
+GTR::PrefabEntity::PrefabEntity(string filename)
+{
+	visible = true;
+	model = Matrix44();
+	entity_type = PREFAB;
+	this->filename = filename;
+	prefab = GTR::Prefab::Get((string("data/") + filename).c_str());
 }
 
 void GTR::PrefabEntity::configure(cJSON* json)
@@ -287,6 +344,36 @@ GTR::LightEntity::LightEntity()
 	shadow_bias = 0.001;
 	light_camera = NULL;
 
+}
+
+GTR::LightEntity::LightEntity(eLightType light_type)
+{
+	//General features
+	visible = true;
+	model = Matrix44();
+	entity_type = LIGHT;
+
+	//Light features
+	this->light_type = light_type;
+	color.set(1.0f, 1.0f, 1.0f);
+	intensity = 20;
+	max_distance = 1000;
+
+	//Spot light
+	cone_angle = 45;
+	cone_exp = 30;
+	spot_shadow_trigger = true;
+
+
+	//Directional light
+	area_size = 1000;
+	directional_shadow_trigger = true;
+
+	//Shadows
+	cast_shadows = false;
+	shadow_index = 0;
+	shadow_bias = 0.001;
+	light_camera = NULL;
 }
 
 void GTR::LightEntity::renderInMenu() 

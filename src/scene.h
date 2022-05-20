@@ -60,6 +60,7 @@ namespace GTR {
 		Prefab* prefab;
 		
 		PrefabEntity();
+		PrefabEntity(std::string filename);
 		virtual void renderInMenu();
 		virtual void configure(cJSON* json);
 	};
@@ -90,6 +91,7 @@ namespace GTR {
 		Camera* light_camera;
 
 		LightEntity();
+		LightEntity(eLightType light_type);
 		virtual void renderInMenu();
 		virtual void configure(cJSON* json);
 	};
@@ -135,6 +137,7 @@ namespace GTR {
 
 		void clear();
 		void addEntity(BaseEntity* entity);
+		std::string nameEntity(std::string default_name);
 		BaseEntity* createEntity(std::string type);
 
 		//JSON methods

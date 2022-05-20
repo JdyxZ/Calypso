@@ -29,6 +29,7 @@ public:
 	bool render_debug;
 	bool render_grid;
 	bool render_gui;
+	bool render_editor;
 
 	//some vars
 	bool mouse_locked; //tells if the mouse is locked (blocked in the center and not visible)
@@ -36,10 +37,16 @@ public:
 	const char* shadow_resolutions[4] = { "512 x 512","1024 x 1024", "2048 x 2048", "4096 x 4096" }; //Array of shadow resolutions
 
 	//Entity creator
-	bool render_editor;
 	int current_entity_type;
 	const char* entity_types[2] = { "PREFAB","LIGHT" }; //Array of entity types for the entity creator
-	const char** assets;
+
+	//Prefab creation
+	std::vector<std::string> assets;
+	const char* current_asset;
+
+	//Light creation
+	int current_light_type;
+	const char* light_types[3] = { "POINT","SPOT","DIRECTIONAL" };
 
 	Application( int window_width, int window_height, SDL_Window* window );
 
