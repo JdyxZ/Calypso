@@ -29,7 +29,6 @@ namespace GTR {
 
 	public:
 
-<<<<<<< Updated upstream
 		//APPLICATION VARIABLES
 		Scene* scene;
 		Camera* camera;
@@ -40,16 +39,12 @@ namespace GTR {
 
 		//Shadow Resolution
 		int shadow_map_resolution = 2048; //Default Resolution
-=======
 		//NEW
 		enum ePipeLine {
 			FORWARD,
 			DEFERRED
 		};
 
-		Scene* scene;		
-		std::vector<LightEntity*> lights; //Here we store each Light to be sent to the Shadder.
-		std::vector<RenderCall*> render_calls; // Here we store each RenderCall to be sent to the Shadder.
 		RenderType light_render; //Whether we are rendering with Single Pass or Multi Pass. By deafult we set the flag to Single Pass.
 		bool alpha_sorting; //Whether we sort render calls or not
 		bool emissive_materials; //Whether we enable prefab's emissive texture or not
@@ -69,7 +64,6 @@ namespace GTR {
 		
 		//Sets the light render mode of the scene
 		void configureRenderer(int render_type, bool normal_mapping, bool alpha_sorting, bool emissive_materials, bool occlusion_texture,bool specular_light);
->>>>>>> Stashed changes
 
 		//Renders several elements of the scene
 		void renderScene(GTR::Scene* scene, Camera* camera);

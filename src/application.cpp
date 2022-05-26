@@ -257,7 +257,6 @@ void Application::renderDebugGUI(void)
 	//Scene algorithms
 	ImGui::Checkbox("Wireframe", &render_wireframe);
 	ImGui::Checkbox("Grid", &render_grid);
-<<<<<<< Updated upstream
 	ImGui::Checkbox("Alpha sorting", &scene->alpha_sorting);
 	ImGui::Checkbox("Emissive materials", &scene->emissive_materials);
 	ImGui::Checkbox("Occlussion texture", &scene->occlusion);
@@ -274,21 +273,7 @@ void Application::renderDebugGUI(void)
 		case(GTR::Singlepass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Singlepass, GTR::Multipass, "SinglePass"); break;
 		case(GTR::Multipass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Singlepass, GTR::Multipass, "Multipass"); break;
 	}
-
-	//Scene Color
-=======
-	ImGui::Checkbox("Alpha sorting", &alpha_sorting);
-	ImGui::Checkbox("Emissive materials", &emissive_materials);
-	ImGui::Checkbox("Occlussion texture", &occlusion);
-	ImGui::Checkbox("Specular light", &specular_light);
-	ImGui::Checkbox("Normal map", &normal_mapping);
-	ImGui::Checkbox("Show Gbuffers", &renderer->show_gbuffers);
-	switch (render_type) {
-		case(Singlepass): ImGui::SliderInt("Render Type", &render_type, Singlepass, Multipass, "SinglePass"); break;
-		case(Multipass): ImGui::SliderInt("Render Type", &render_type, Singlepass, Multipass, "Multipass"); break;
-	}
 	ImGui::Combo("Pipeline", (int*)&renderer->pipeline, "Forward\0Deferred", 2);
->>>>>>> Stashed changes
 	ImGui::ColorEdit3("BG color", scene->background_color.v);
 	ImGui::ColorEdit3("Ambient Light", scene->ambient_light.v);
 
@@ -332,13 +317,10 @@ void Application::onKeyDown( SDL_KeyboardEvent event )
 	{
 		case SDLK_ESCAPE: must_exit = true; break; //ESC key, kill the app
 		case SDLK_F1: render_debug = !render_debug; break;
-<<<<<<< Updated upstream
 		case SDLK_f: camera->center.set(0, 0, 0); camera->updateViewMatrix(); camera->camera_tracker = true; break;
-=======
-		case SDLK_f: camera->center.set(0, 0, 0); camera->updateViewMatrix(); break;
+		//case SDLK_f: camera->center.set(0, 0, 0); camera->updateViewMatrix(); break;
 		case SDLK_p: renderer->pipeline = (renderer->pipeline == GTR::Renderer::FORWARD ? GTR::Renderer::DEFERRED : GTR::Renderer::FORWARD);
 		case SDLK_g: renderer->show_gbuffers = (renderer->show_gbuffers == false ? true : false) ;
->>>>>>> Stashed changes
 		case SDLK_F5: Shader::ReloadAll(); break;
 		case SDLK_F6:
 			scene->clear();

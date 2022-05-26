@@ -1,9 +1,11 @@
 //Shaders
 singlepass pixel.vs single.fs
 multipass pixel.vs multi.fs
-<<<<<<< Updated upstream
 linearize quad.vs linearize.fs
 depth depth.vs color.fs
+gbuffers pixel.vs gbuffers.fs
+deferred quad.vs deferred.fs
+
 
 \methods
 
@@ -70,41 +72,6 @@ float testShadowMap(in float shadow_index, in float num_shadows,in float shadows
 	//Return shadow factor
 	return shadow_factor;
 }
-=======
-gbuffers pixel.vs gbuffers.fs
-deferred quad.vs deferred.fs
-depth quad.vs depth.fs
-flat pixel.vs flat.fs
->>>>>>> Stashed changes
-
-\tools
-
-mat3 cotangent_frame(in vec3 N, in vec3 p, in vec2 uv)
-{
-	// get edge vectors of the pixel triangle
-	vec3 dp1 = dFdx( p );
-	vec3 dp2 = dFdy( p );
-	vec2 duv1 = dFdx( uv );
-	vec2 duv2 = dFdy( uv );
-	
-	// solve the linear system
-	vec3 dp2perp = cross( dp2, N );
-	vec3 dp1perp = cross( N, dp1 );
-	vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
-	vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
- 
-	// construct a scale-invariant frame 
-	float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
-	return mat3( T * invmax, B * invmax, N );
-}
-
-vec3 perturbNormal(in vec3 N, in vec3 WP, in vec2 uv, in vec3 normal_pixel)
-{
-	normal_pixel = normal_pixel * 255./127. - 128./127.;
-	mat3 TBN = cotangent_frame(N, WP, uv);
-	return normalize(TBN * normal_pixel);
-}
-
 
 
 \pixel.vs
@@ -144,7 +111,7 @@ void main()
 \gbuffers.fs
 
 #version 330 core
-#include tools
+#include methods
 
 in vec3 v_position;
 in vec3 v_world_position;
@@ -186,7 +153,7 @@ void main()
 
 #version 330 core
 
-#include tools
+#include methods
 
 //Interpolated variables
 in vec3 v_position;
@@ -301,7 +268,7 @@ void main()
 	vec4 gb2_color = texture( u_extra_texture, uv );
 
 	//normals must be converted from 0..1 to -1..+1
-	vec3 N = texture( gb1_color, uv ).xyz;
+	vec3 N = gb1_color.xyz;
 	N = normalize(N * 2.0 - 1.0); //always normalize in case of data loss
 
 	//reconstruct world position from depth and inv. viewproj
@@ -311,7 +278,7 @@ void main()
 	vec3 worldpos = proj_worldpos.xyz / proj_worldpos.w;
 
 	//discard some pixels depending on the pixel screen position and its transparency
-	if(	color.a < 0.9 && 
+	if(	gb0_color.a < 0.9 && 
 	floor(mod(gl_FragCoord.x,2.0)) !=
 	floor(mod(gl_FragCoord.y,2.0)) )
 		discard;
@@ -383,6 +350,7 @@ void main()
 	}	
 
 	//Final color
+	vec4 color;
 	color.rgb *= phong_light;
 	if(u_last_iteration)
 	{
@@ -842,6 +810,7 @@ void main()
 }
 
 \depth.vs
+
 
 #version 330 core
 

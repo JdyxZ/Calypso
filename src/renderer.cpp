@@ -28,16 +28,14 @@ bool sortRenderCall(const RenderCall* rc1, const RenderCall* rc2)
 	else return true;
 }
 
-<<<<<<< Updated upstream
-bool sortLight(const LightEntity* l1, const LightEntity* l2) 
+bool sortLight(const LightEntity* l1, const LightEntity* l2)
 {
 	bool l1_cast_shadows = l1->cast_shadows;
 	bool l2_cast_shadows = l2->cast_shadows;
 	if (l1_cast_shadows && !l2_cast_shadows) return true;
 	else if (!l1_cast_shadows && l2_cast_shadows) return false;
 	else return true;
-
-=======
+}
 
 Renderer::Renderer() {
 	
@@ -59,8 +57,6 @@ void Renderer::configureRenderer(int render_type, bool normal_mapping, bool alph
 	this->occlusion = occlusion_texture;
 	this->specular_light = specular_light;
 
-	
->>>>>>> Stashed changes
 }
 
 void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
@@ -130,15 +126,12 @@ void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
 			{
 				//Assign a shadow slot for shadow atlas
 				lights[i]->shadow_index = shadow_index;
-
-<<<<<<< Updated upstream
 				//Update
 				scene->num_shadows++;
 				shadow_index++;
 			}
 		}
 	}
-=======
 	//Now we sort the RenderCalls vector according to the boolean method sortRenderCall
 	if (alpha_sorting) std::sort(render_calls.begin(), render_calls.end(), sortRenderCall);
 
@@ -165,7 +158,6 @@ void GTR::Renderer::renderForward(Camera* camera, GTR::Scene* scene) {
 	// Clear the color and the depth buffer
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	checkGLErrors();
->>>>>>> Stashed changes
 
 	//Create Shadow Atlas: We create a dynamic atlas to be resizable
 	if (scene->shadow_visibility_tracker || scene->shadow_resolution_tracker) createShadowAtlas();
@@ -210,9 +202,6 @@ void GTR::Renderer::renderForward(Camera* camera, GTR::Scene* scene) {
 			renderDrawCall(render_calls[i], camera); 	
 		}
 	}
-}
-
-<<<<<<< Updated upstream
 	//Debug shadow maps
 	if (scene->show_atlas) showShadowAtlas();
 
@@ -220,8 +209,9 @@ void GTR::Renderer::renderForward(Camera* camera, GTR::Scene* scene) {
 	if (scene->entity_tracker) scene->entity_tracker = false;
 	if (scene->shadow_visibility_tracker) scene->shadow_visibility_tracker = false;
 	if (camera->camera_tracker) camera->camera_tracker = false;
+}
 
-=======
+
 //NEW
 void GTR::Renderer::renderDeferred(Camera* camera, GTR::Scene* scene) {
 
@@ -376,14 +366,13 @@ void GTR::Renderer::renderDeferred(Camera* camera, GTR::Scene* scene) {
 		glViewport(0, 0, width * 0.5, height * 0.5);
 		gbuffers_fbo->color_textures[2]->toViewport();
 		glViewport(width * 0.5, 0, width * 0.5, height * 0.5);
-		Shader* shader = Shader::getDefaultShader("depth");
+		Shader* shader = Shader::getDefaultShader("linearize");
 		shader->enable();
 		shader->setUniform("u_camera_nearfar", Vector2(camera->near_plane,camera->far_plane));
 		gbuffers_fbo->depth_texture->toViewport(shader);
 
 		glViewport(0, 0, width, height);
 	}
->>>>>>> Stashed changes
 }
 
 //renders all the prefab
