@@ -228,8 +228,8 @@ void GTR::Renderer::renderDeferred(Camera* camera, GTR::Scene* scene) {
 		//create 3 textures of 4 components
 		gbuffers_fbo->create(Application::instance->window_width, Application::instance->window_height,
 			3, 			//three textures
-			GL_RGBA, 		//four channels
-			GL_FLOAT, //1 byte
+			GL_RGBA, 	//four channels
+			GL_FLOAT,	//1 byte
 			true);		//add depth_texture
 
 		//create and FBO
@@ -238,10 +238,9 @@ void GTR::Renderer::renderDeferred(Camera* camera, GTR::Scene* scene) {
 		//create 3 textures of 4 components
 		illumination_fbo->create(width, height,
 			1, 			//one textures
-			GL_RGB, 		//three channels
-			GL_FLOAT, //1 byte
+			GL_RGB, 	//three channels
+			GL_FLOAT,	//1 byte
 			true);		//add depth_texture
-
 	}
 
 	//start rendering inside the gbuffers
@@ -269,17 +268,18 @@ void GTR::Renderer::renderDeferred(Camera* camera, GTR::Scene* scene) {
 	//stop rendering to the gbuffers
 	gbuffers_fbo->unbind();
 
-	illumination_fbo->bind();
-
-	glDisable(GL_DEPTH_TEST);
 	//set the clear color (the background color)
-	glClearColor(1, 0, 0, 1.0);
+	glClearColor(1,0,0, 1.0);
 
 	// Clear the color and the depth buffer
 	glClear(GL_COLOR_BUFFER_BIT);
 
+	illumination_fbo->bind();
+
+	glDisable(GL_DEPTH_TEST);
+
 	//we need a fullscreen quad
-	Mesh* quad = Mesh::getQuad();
+	Mesh* quad = Mesh::getQuad(); //CAMBIAR PARA PBR...
 
 	//we need a shader specially for this task, lets call it "deferred"
 	Shader* shader = Shader::Get("deferred");
@@ -297,53 +297,58 @@ void GTR::Renderer::renderDeferred(Camera* camera, GTR::Scene* scene) {
 	//pass the inverse window resolution, this may be useful
 	shader->setUniform("u_iRes", Vector2(1.0 / (float)width, 1.0 / (float)height));
 
-	
-	for (int i = 0; i < lights.size(); i++) {
-
-		if (i == 0) shader->setUniform("u_last_iteration", 0);
-
-		if (i == 1)
-		{
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-			shader->setUniform("u_ambient_light", Vector3());//reset the ambient light
-		}
-		if (i == lights.size() - 1) shader->setUniform("u_last_iteration", 1);
-
-		//Current light
-		LightEntity* light = lights[i];
-
-		//Light uniforms
-		shader->setUniform("u_light_position", light->model.getTranslation());
-		shader->setUniform("u_light_color", light->color);
-		shader->setUniform("u_light_intensity", light->intensity);
-		shader->setUniform("u_light_max_distance", light->max_distance);
-
-		//Specific light uniforms
-		switch (light->light_type)
-		{
-		case(eLightType::POINT):
-			shader->setUniform("u_light_type", 0);
-			break;
-		case (eLightType::SPOT):
-			if (light->visible == true && light->model.getTranslation().y < 10.0) light->visible = false;
-			else if ((light->cone_angle < 2.0 && light->cone_angle > -2.0) || light->cone_angle < -90.0 || light->cone_angle > 90.0) shader->setUniform("u_light_type", 0);
-			else
-			{
-				shader->setVector3("u_spot_direction", light->model.rotateVector(Vector3(0, 0, -1)).normalize());
-				shader->setUniform("u_spot_cone", Vector2(light->cone_exp, cos(light->cone_angle * DEG2RAD)));
-				shader->setUniform("u_light_type", 1);
-			}
-			break;
-		case (eLightType::DIRECTIONAL):
-			shader->setVector3("u_directional_front", light->model.rotateVector(Vector3(0, 0, -1)).normalize());
-			shader->setUniform("u_area_size", light->area_size);
-			shader->setUniform("u_light_type", 2);
-			break;
-		}
-
-		//do the draw call that renders the mesh into the screen
+	if (!lights.size()) {
+		shader->setUniform("u_light_color", Vector3());
 		quad->render(GL_TRIANGLES);
+	}
+	else {
+		for (int i = 0; i < lights.size(); i++) {
+
+			if (i == 0) shader->setUniform("u_last_iteration", 0);
+
+			if (i == 1)
+			{
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+				shader->setUniform("u_ambient_light", Vector3());//reset the ambient light
+			}
+			if (i == lights.size() - 1) shader->setUniform("u_last_iteration", 1);
+
+			//Current light
+			LightEntity* light = lights[i];
+
+			//Light uniforms
+			shader->setUniform("u_light_position", light->model.getTranslation());
+			shader->setUniform("u_light_color", light->color);
+			shader->setUniform("u_light_intensity", light->intensity);
+			shader->setUniform("u_light_max_distance", light->max_distance);
+
+			//Specific light uniforms
+			switch (light->light_type)
+			{
+			case(eLightType::POINT):
+				shader->setUniform("u_light_type", 0);
+				break;
+			case (eLightType::SPOT):
+				if (light->visible == true && light->model.getTranslation().y < 10.0) light->visible = false;
+				else if ((light->cone_angle < 2.0 && light->cone_angle > -2.0) || light->cone_angle < -90.0 || light->cone_angle > 90.0) shader->setUniform("u_light_type", 0);
+				else
+				{
+					shader->setVector3("u_spot_direction", light->model.rotateVector(Vector3(0, 0, -1)).normalize());
+					shader->setUniform("u_spot_cone", Vector2(light->cone_exp, cos(light->cone_angle * DEG2RAD)));
+					shader->setUniform("u_light_type", 1);
+				}
+				break;
+			case (eLightType::DIRECTIONAL):
+				shader->setVector3("u_directional_front", light->model.rotateVector(Vector3(0, 0, -1)).normalize());
+				shader->setUniform("u_area_size", light->area_size);
+				shader->setUniform("u_light_type", 2);
+				break;
+			}
+
+			//do the draw call that renders the mesh into the screen
+			quad->render(GL_TRIANGLES);
+		}
 	}
 
 	//disable depth test and blend!!
@@ -354,6 +359,9 @@ void GTR::Renderer::renderDeferred(Camera* camera, GTR::Scene* scene) {
 	quad->render(GL_TRIANGLES);
 
 	illumination_fbo->unbind();
+
+	//be sure blending is not active
+	glDisable(GL_BLEND);
 
 	illumination_fbo->color_textures[0]->toViewport();
 
@@ -370,8 +378,8 @@ void GTR::Renderer::renderDeferred(Camera* camera, GTR::Scene* scene) {
 		shader->enable();
 		shader->setUniform("u_camera_nearfar", Vector2(camera->near_plane,camera->far_plane));
 		gbuffers_fbo->depth_texture->toViewport(shader);
-
 		glViewport(0, 0, width, height);
+		shader->disable();
 	}
 }
 
@@ -1051,7 +1059,7 @@ void GTR::Renderer::showShadowAtlas()
 				glViewport((light->shadow_index - starting_shadow) * SHOW_ATLAS_RESOLUTION + shadow_offset, 0, SHOW_ATLAS_RESOLUTION, SHOW_ATLAS_RESOLUTION);
 
 				//Render the shadow map with the linearized shader
-				Shader* shader = Shader::getDefaultShader("linearize");
+				Shader* shader = Shader::getDefaultShader("linearize_atlas");
 				shader->enable();
 				shader->setUniform("u_camera_nearfar", Vector2(light->light_camera->near_plane, light->light_camera->far_plane));
 				shader->setUniform("u_shadow_index", (float)light->shadow_index);

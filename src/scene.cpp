@@ -22,7 +22,7 @@ GTR::Scene::Scene()
 	occlusion = true;
 	specular_light = true;
 	normal_mapping = true;
-	render_type = Singlepass;
+	render_type = Multipass;
 	shadow_sorting = false;
 	num_shadows = 0;
 
