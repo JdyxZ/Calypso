@@ -504,6 +504,7 @@ char* fetchBufferVec4(char* data, std::vector<Vector4>& vector)
 	return data;
 }
 
+//Read JSON
 bool readJSONBoolean(cJSON* obj, const char* name, float default_value)
 {
 	cJSON* str_json = cJSON_GetObjectItemCaseSensitive((cJSON*)obj, name);
@@ -533,7 +534,7 @@ std::string readJSONString(cJSON* obj, const char* name, const char* default_str
 	return str_json->valuestring;
 }
 
-bool readJSONVector(cJSON* obj, const char* name, std::vector<float>& dst)
+bool readJSONFloatVector(cJSON* obj, const char* name, std::vector<float>& dst)
 {
 	cJSON* array_json = cJSON_GetObjectItemCaseSensitive((cJSON*)obj, name);
 	if (!array_json)
@@ -554,10 +555,31 @@ bool readJSONVector(cJSON* obj, const char* name, std::vector<float>& dst)
 	return true;
 }
 
+bool readJSONBooleanVector(cJSON* obj, const char* name, std::vector<bool>& dst)
+{
+	cJSON* array_json = cJSON_GetObjectItemCaseSensitive((cJSON*)obj, name);
+	if (!array_json)
+		return false;
+	if (!cJSON_IsArray(array_json))
+		return false;
+
+	dst.resize(cJSON_GetArraySize(array_json));
+	for (int i = 0; i < dst.size(); ++i)
+	{
+		cJSON* value_json = cJSON_GetArrayItem(array_json, i);
+		if (value_json)
+			dst[i] = value_json->valueint;
+		else
+			dst[i] = 1;
+	}
+
+	return true;
+}
+
 Vector3 readJSONVector3(cJSON* obj, const char* name, Vector3 default_value)
 {
 	std::vector<float> dst;
-	if (readJSONVector(obj, name, dst))
+	if (readJSONFloatVector(obj, name, dst))
 	{
 		if (dst.size() == 3)
 			return Vector3(dst[0], dst[1], dst[2]);
@@ -568,7 +590,7 @@ Vector3 readJSONVector3(cJSON* obj, const char* name, Vector3 default_value)
 Vector4 readJSONVector4(cJSON* obj, const char* name)
 {
 	std::vector<float> dst;
-	if (readJSONVector(obj, name, dst))
+	if (readJSONFloatVector(obj, name, dst))
 	{
 		if (dst.size() == 4)
 			return Vector4(dst[0], dst[1], dst[2], dst[3]);
@@ -576,6 +598,212 @@ Vector4 readJSONVector4(cJSON* obj, const char* name)
 	return Vector4();
 }
 
+cJSON* readJSONArrayItem(cJSON* obj, const char* name, int index)
+{
+	cJSON* array_json = cJSON_GetObjectItemCaseSensitive((cJSON*)obj, name);
+	if (!array_json)
+		return NULL;
+	if (!cJSON_IsArray(array_json))
+		return NULL;
+
+	return cJSON_GetArrayItem(array_json, index);
+}
+
+//Populate JSON
+bool populateJSONBooleanArray(cJSON* arr, std::vector<bool>& vtr)
+{
+	if (!arr)
+		return false;
+	if (!cJSON_IsArray(arr))
+		return false;
+
+	vtr.resize(cJSON_GetArraySize(arr));
+	for (int i = 0; i < vtr.size(); ++i)
+	{
+		cJSON* value_json = cJSON_GetArrayItem(arr, i);
+		if (value_json)
+			vtr[i] = value_json->valueint;
+		else
+			vtr[i] = 0;
+	}
+
+	return true;
+}
+
+bool populateJSONStringArray(cJSON* arr, std::vector<std::string>& vtr)
+{
+	if (!arr)
+		return false;
+	if (!cJSON_IsArray(arr))
+		return false;
+
+	vtr.resize(cJSON_GetArraySize(arr));
+	for (int i = 0; i < vtr.size(); ++i)
+	{
+		cJSON* value_json = cJSON_GetArrayItem(arr, i);
+		if (value_json)
+			vtr[i] = value_json->valuestring;
+		else
+			vtr[i] = "";
+	}
+
+	return true;
+}
+
+bool populateJSONIntArray(cJSON* arr, int* vtr, int vtr_size)
+{
+	if (!arr)
+		return false;
+	if (!cJSON_IsArray(arr))
+		return false;
+
+	for (int i = 0; i < vtr_size; ++i)
+	{
+		cJSON* value_json = cJSON_GetArrayItem(arr, i);
+		if (value_json)
+			vtr[i] = value_json->valueint;
+		else
+			vtr[i] = 0;
+	}
+
+	return true;
+}
+
+bool populateJSONIntArray(cJSON* arr, std::vector<int>& vtr)
+{
+	if (!arr)
+		return false;
+	if (!cJSON_IsArray(arr))
+		return false;
+
+	vtr.clear();
+	vtr.resize(cJSON_GetArraySize(arr));
+
+	for (int i = 0; i < vtr.size(); ++i)
+	{
+		cJSON* value_json = cJSON_GetArrayItem(arr, i);
+		if (value_json)
+			vtr[i] = value_json->valueint;
+		else
+			vtr[i] = 0;
+	}
+
+	return true;
+}
+
+bool populateJSONFloatArray(cJSON* arr, float* vtr, int vtr_size)
+{
+	if (!arr)
+		return false;
+	if (!cJSON_IsArray(arr))
+		return false;
+
+	for (int i = 0; i < vtr_size; ++i)
+	{
+		cJSON* value_json = cJSON_GetArrayItem(arr, i);
+		if (value_json)
+			vtr[i] = value_json->valuedouble;
+		else
+			vtr[i] = 0.f;
+	}
+
+	return true;
+}
+
+bool populateJSONFloatArray(cJSON* arr, std::vector<float>& vtr)
+{
+	if (!arr)
+		return false;
+	if (!cJSON_IsArray(arr))
+		return false;
+
+	vtr.clear();
+	vtr.resize(cJSON_GetArraySize(arr));
+
+	for (int i = 0; i < vtr.size(); ++i)
+	{
+		cJSON* value_json = cJSON_GetArrayItem(arr, i);
+		if (value_json)
+			vtr[i] = value_json->valuedouble;
+		else
+			vtr[i] = 0.f;
+	}
+
+	return true;
+}
+
+//Write JSON
+void writeJSONBoolean(cJSON* obj, const char* name, bool boolean)
+{
+	cJSON_AddBoolToObject(obj, name, boolean);
+}
+
+void writeJSONNumber(cJSON* obj, const char* name, float number)
+{
+	cJSON_AddNumberToObject(obj, name, number);
+}
+
+void writeJSONString(cJSON* obj, const char* name, std::string str)
+{
+	cJSON_AddStringToObject(obj, name, str.c_str());
+}
+
+void writeJSONBooleanVector(cJSON* obj, const char* name, const int* vtr, int vtr_size)
+{
+	cJSON* vector_json = cJSON_CreateIntArray(vtr, vtr_size);
+	cJSON_AddItemToObject(obj, name, vector_json);
+}
+
+void writeJSONBooleanVector(cJSON* obj, const char* name, std::vector<int>& vtr)
+{
+	const int* tmp_vtr = &vtr[0];
+	cJSON* vector_json = cJSON_CreateIntArray(tmp_vtr, vtr.size());
+	cJSON_AddItemToObject(obj, name, vector_json);
+}
+
+void writeJSONIntVector(cJSON* obj, const char* name, const int* vtr, int vtr_size)
+{
+	cJSON* vector_json = cJSON_CreateIntArray(vtr, vtr_size);
+	cJSON_AddItemToObject(obj, name, vector_json);
+}
+
+void writeJSONIntVector(cJSON* obj, const char* name, std::vector<int>& vtr)
+{
+
+	const int* tmp_vtr = &vtr[0];
+	cJSON* vector_json = cJSON_CreateIntArray(tmp_vtr, vtr.size());
+	cJSON_AddItemToObject(obj, name, vector_json);
+}
+
+void writeJSONFloatVector(cJSON* obj, const char* name, const float* vtr, int vtr_size)
+{
+	cJSON* vector_json = cJSON_CreateFloatArray(vtr, vtr_size);
+	cJSON_AddItemToObject(obj, name, vector_json);
+}
+
+void writeJSONFloatVector(cJSON* obj, const char* name, std::vector<float>& vtr)
+{
+
+	const float* tmp_vtr = &vtr[0];
+	cJSON* vector_json = cJSON_CreateFloatArray(tmp_vtr, vtr.size());
+	cJSON_AddItemToObject(obj, name, vector_json);
+}
+
+void writeJSONVector3(cJSON* obj, const char* name, Vector3& vtr)
+{
+	const float tmp_vtr[3] = { vtr.x,vtr.y,vtr.z };
+	cJSON* vector_json = cJSON_CreateFloatArray(tmp_vtr, 3);
+	cJSON_AddItemToObject(obj, name, vector_json);
+}
+
+void writeJSONVector4(cJSON* obj, const char* name, Vector4& vtr)
+{
+	const float tmp_vtr[4] = { vtr.x,vtr.y,vtr.z, vtr.w };
+	cJSON* vector_json = cJSON_CreateFloatArray(tmp_vtr, 4);
+	cJSON_AddItemToObject(obj, name, vector_json);
+}
+
+//Replace JSON
 void replaceJSONBoolean(cJSON* obj, const char* name, bool boolean)
 {
 	cJSON* new_item = cJSON_CreateBool(boolean);
@@ -590,28 +818,36 @@ void replaceJSONNumber(cJSON* obj, const char* name, float number)
 
 }
 
-void replaceJSONString(cJSON* obj, const char* name, const char* string) 
+void replaceJSONString(cJSON* obj, const char* name, const char* string)
 {
 	cJSON* new_item = cJSON_CreateString(string);
 	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
 }
 
-void replaceJSONFloatVector(cJSON* obj, const char* name, float* vector, int size)
+void replaceJSONBooleanVector(cJSON* obj, const char* name, std::vector<int>& vtr)
 {
-	cJSON* new_item = cJSON_CreateFloatArray(vector, size);
+	const int* tmp_vtr = &vtr[0];
+	cJSON* vector_json = cJSON_CreateIntArray(tmp_vtr, vtr.size());
+	cJSON_AddItemToObject(obj, name, vector_json);
+}
+
+void replaceJSONFloatVector(cJSON* obj, const char* name, std::vector<float>& vtr)
+{
+	const float* tmp_vtr = &vtr[0];
+	cJSON* new_item = cJSON_CreateFloatArray(tmp_vtr, vtr.size());
 	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
 }
 
 void replaceJSONVector3(cJSON* obj, const char* name, Vector3 vector)
 {
 	const float new_array[3] = { vector.x,vector.y,vector.z };
-	cJSON* new_item = cJSON_CreateFloatArray(new_array,3);
+	cJSON* new_item = cJSON_CreateFloatArray(new_array, 3);
 	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
 }
 
 void replaceJSONVector4(cJSON* obj, const char* name, Vector4 vector)
 {
-	const float new_array[4] = { vector.x,vector.y,vector.z, vector.w};
+	const float new_array[4] = { vector.x,vector.y,vector.z, vector.w };
 	cJSON* new_item = cJSON_CreateFloatArray(new_array, 4);
 	cJSON_ReplaceItemInObjectCaseSensitive(obj, name, new_item);
 }

@@ -1898,6 +1898,38 @@ CJSON_PUBLIC(void) cJSON_AddItemToArray(cJSON *array, cJSON *item)
     add_item_to_array(array, item);
 }
 
+CJSON_PUBLIC(void) cJSON_AddBoolToArray(cJSON* array, bool boolean)
+{
+    cJSON* bool_item = cJSON_CreateBool(boolean);
+    add_item_to_array(array, bool_item);
+
+}
+
+CJSON_PUBLIC(void) cJSON_AddNumberToArray(cJSON* array, float number)
+{
+    cJSON* number_item = cJSON_CreateNumber(number);
+    add_item_to_array(array, number_item);
+
+}
+
+CJSON_PUBLIC(void) cJSON_AddStringToArray(cJSON* array, const char* str)
+{
+    cJSON* string_item = cJSON_CreateString(str);
+    add_item_to_array(array, string_item);
+}
+
+CJSON_PUBLIC(void) cJSON_AddIntVectorToArray(cJSON* array, const int* vtr, int vtr_size)
+{
+    cJSON* number_item = cJSON_CreateIntArray(vtr, vtr_size);
+    add_item_to_array(array, number_item);
+}
+
+CJSON_PUBLIC(void) cJSON_AddFloatVectorToArray(cJSON* array, const float* vtr, int vtr_size)
+{
+    cJSON* number_item = cJSON_CreateFloatArray(vtr, vtr_size);
+    add_item_to_array(array, number_item);
+}
+
 #if defined(__clang__) || (defined(__GNUC__)  && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ > 5))))
     #pragma GCC diagnostic push
 #endif

@@ -222,6 +222,11 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateStringArray(const char *const *strings, int co
 
 /* Append item to the specified array/object. */
 CJSON_PUBLIC(void) cJSON_AddItemToArray(cJSON *array, cJSON *item);
+CJSON_PUBLIC(void) cJSON_AddBoolToArray(cJSON* array, bool boolean);
+CJSON_PUBLIC(void) cJSON_AddNumberToArray(cJSON* array, float number);
+CJSON_PUBLIC(void) cJSON_AddStringToArray(cJSON* array, const char* str);
+CJSON_PUBLIC(void) cJSON_AddIntVectorToArray(cJSON* array, const int* vtr, int vtr_size);
+CJSON_PUBLIC(void) cJSON_AddFloatVectorToArray(cJSON* array, const float* vtr, int vtr_size);
 CJSON_PUBLIC(void) cJSON_AddItemToObject(cJSON *object, const char *string, cJSON *item);
 /* Use this when string is definitely const (i.e. a literal, or as good as), and will definitely survive the cJSON object.
  * WARNING: When this function was used, make sure to always check that (item->type & cJSON_StringIsConst) is zero before

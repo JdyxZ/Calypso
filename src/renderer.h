@@ -30,6 +30,7 @@ namespace GTR {
 
 		//Application variables
 		Scene* scene;
+		Camera* camera;
 
 		//Render variables
 		std::vector<LightEntity*> lights; //Here we store each Light to be sent to the Shadder.
@@ -38,31 +39,28 @@ namespace GTR {
 		//Shadow Resolution
 		int shadow_map_resolution = 2048; //Default Resolution
 
-		//Renders several elements of the scene
-		void renderScene(GTR::Scene* scene, Camera* camera);
-	
-		//Processes a whole prefab (with all its nodes)
-		void processPrefab(const Matrix44& model, GTR::Prefab* prefab, Camera* camera);
+		//Constructor
+		Renderer(Scene* scene, Camera* camera);
 
-		//Processes one node from the prefab and its children
-		void processNode(const Matrix44& model, GTR::Node* node, Camera* camera);
+		//Renders several elements of the scene with the given camera
+		void renderScene();
+			
+		//Scene elements
+		void processScene();
+		void processPrefab(const Matrix44& model, GTR::Prefab* prefab, Camera* camera);  //Processes a whole prefab (with all its nodes)
+		void processNode(const Matrix44& model, GTR::Node* node, Camera* camera); //Processes one node from the prefab and its children
 
-		//Render a draw call
-		void renderDrawCall(RenderCall* rc, Camera* camera);
-
-		//Render a basic draw call
-		void renderDepthMap(RenderCall* rc, Camera* light_camera);
-
-		//Singlepass lighting
-		void SinglePassLoop(Mesh* mesh, Shader* shader);
-
-		//Multipass lighting
-		void MultiPassLoop(Mesh* mesh, Shader* shader);
+		//Forward pipeline
+		void renderDrawCall(RenderCall* rc, Camera* camera); //Render a draw call	
+		void SinglePassLoop(Mesh* mesh, Shader* shader); //Singlepass lighting
+		void MultiPassLoop(Mesh* mesh, Shader* shader); //Multipass lighting
 
 		//Shadow Atlas
-		void createShadowAtlas();
+		void updateShadowAtlas();
+		void computeShadowAtlas();
 		void computeSpotShadowMap(LightEntity* light);
 		void computeDirectionalShadowMap(LightEntity* light, Camera* camera);
+		void renderDepthMap(RenderCall* rc, Camera* light_camera);
 		void showShadowAtlas();
 
 	};

@@ -48,6 +48,9 @@ public:
 	int current_light_type;
 	const char* light_types[3] = { "POINT","SPOT","DIRECTIONAL" };
 
+	//ImGui IO
+	ImGuiIO* io = &ImGui::GetIO();
+
 	Application( int window_width, int window_height, SDL_Window* window );
 
 	//main functions

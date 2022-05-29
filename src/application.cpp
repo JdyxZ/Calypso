@@ -30,6 +30,7 @@ FBO* fbo = nullptr;
 Texture* texture = nullptr;
 
 float cam_speed = 10;
+bool scene_saved = false;
 
 Application::Application(int window_width, int window_height, SDL_Window* window)
 {
@@ -86,12 +87,12 @@ Application::Application(int window_width, int window_height, SDL_Window* window
 	scene = new GTR::Scene();
 	scene->main_camera = camera;
 
-	//Load the JSON
+	//Load the scene JSON
 	if (!scene->load("data/scene.json"))
 		exit(1);
 
 	//This class will be the one in charge of rendering all 
-	renderer = new GTR::Renderer(); //here so we have opengl ready in constructor
+	renderer = new GTR::Renderer(scene, camera); //here so we have opengl ready in constructor
 
 	//hide the cursor
 	SDL_ShowCursor(!mouse_locked); //hide or show the mouse
@@ -121,7 +122,7 @@ void Application::render(void)
 	//renderer->renderPrefab( model, prefab, camera );
 
 	//Render the scene
-	renderer->renderScene(scene, camera);
+	renderer->renderScene();
 
 	//Draw the floor grid, helpful to have a reference point
 	if(render_grid)
@@ -169,7 +170,7 @@ void Application::update(double seconds_elapsed)
 
 	//Move camera using WASD controls
 	if (Input::isKeyPressed(SDL_SCANCODE_W)) camera->move(Vector3(0.0f, 0.0f, 1.0f) * speed), camera->camera_trigger = true;
-	if (Input::isKeyPressed(SDL_SCANCODE_S)) camera->move(Vector3(0.0f, 0.0f, -1.0f) * speed), camera->camera_trigger = true;
+	if (Input::isKeyPressed(SDL_SCANCODE_S) && !Input::isKeyPressed(SDL_SCANCODE_LCTRL)) camera->move(Vector3(0.0f, 0.0f, -1.0f) * speed), camera->camera_trigger = true;
 	if (Input::isKeyPressed(SDL_SCANCODE_A)) camera->move(Vector3(1.0f, 0.0f, 0.0f) * speed), camera->camera_trigger = true;
 	if (Input::isKeyPressed(SDL_SCANCODE_D)) camera->move(Vector3(-1.0f, 0.0f, 0.0f) * speed), camera->camera_trigger = true;
 	
@@ -186,6 +187,15 @@ void Application::update(double seconds_elapsed)
 	{
 		Input::centerMouse();
 		//ImGui::SetCursorPos(ImVec2(Input::mouse_position.x, Input::mouse_position.y));
+	}
+
+	if (Input::isKeyPressed(SDL_SCANCODE_LCTRL) && Input::isKeyPressed(SDL_SCANCODE_S))
+	{
+		if (!scene_saved)
+		{
+			scene->save();
+			scene_saved = true;
+		}
 	}
 
 }
@@ -344,12 +354,13 @@ void Application::renderEntityEditor()
 
 		if (create_light)
 		{
-			GTR::LightEntity* new_light = new GTR::LightEntity(GTR::eLightType(current_light_type));
+			GTR::LightEntity* new_light = new GTR::LightEntity(GTR::LightType(current_light_type));
 			new_light->model.translate(camera->center.x, camera->center.y, camera->center.z);
-			if (new_light->light_type == GTR::eLightType::POINT) new_light->name = scene->nameEntity(string("point light"));
-			else if (new_light->light_type == GTR::eLightType::SPOT) new_light->name = scene->nameEntity(string("spotlight"));
-			else if (new_light->light_type == GTR::eLightType::DIRECTIONAL) new_light->name = scene->nameEntity(string("directional light"));
+			if (new_light->light_type == GTR::LightType::POINT) new_light->name = scene->nameEntity(string("point light"));
+			else if (new_light->light_type == GTR::LightType::SPOT) new_light->name = scene->nameEntity(string("spotlight"));
+			else if (new_light->light_type == GTR::LightType::DIRECTIONAL) new_light->name = scene->nameEntity(string("directional light"));
 			scene->addEntity(new_light);
+			scene->light_trigger = true;
 		}
 	}
 	else
@@ -376,6 +387,7 @@ void Application::renderEntityEditor()
 			new_prefab->model.translate(camera->center.x, camera->center.y, camera->center.z);
 			new_prefab->name = scene->nameEntity(string(current_asset));
 			scene->addEntity(new_prefab);
+			scene->prefab_trigger = true;
 		}
 	}
 
@@ -389,7 +401,7 @@ void Application::onKeyDown( SDL_KeyboardEvent event )
 	{
 		case SDLK_ESCAPE: must_exit = true; break; //ESC key, kill the app
 		case SDLK_F1: render_debug = !render_debug; break;
-		case SDLK_f: camera->center.set(0, 0, 0); camera->updateViewMatrix(); camera->camera_trigger = true; break;
+		case SDLK_F2:  camera->center.set(0, 0, 0); camera->updateViewMatrix(); camera->camera_trigger = true; break;
 		case SDLK_F5: Shader::ReloadAll(); break;
 		case SDLK_F6:
 			scene->clear();
@@ -404,13 +416,128 @@ void Application::onKeyDown( SDL_KeyboardEvent event )
 		case SDLK_RIGHT:
 			scene->atlas_scope++;
 			break;
+		case SDLK_a:
+			io->AddInputCharacter('a');
+			break;
+		case SDLK_b:
+			io->AddInputCharacter('b');
+			break;
+		case SDLK_c:
+			io->AddInputCharacter('c');
+			break;
+		case SDLK_d:
+			io->AddInputCharacter('d');
+			break;
+		case SDLK_e:
+			io->AddInputCharacter('e');
+			break;
+		case SDLK_f:
+			io->AddInputCharacter('f');
+			break;
 		case SDLK_g:
-			scene->save();
+			io->AddInputCharacter('g');
+			break;
+		case SDLK_h:
+			io->AddInputCharacter('h');
+			break;
+		case SDLK_i:
+			io->AddInputCharacter('i');
+			break;
+		case SDLK_j:
+			io->AddInputCharacter('j');
+			break;
+		case SDLK_k:
+			io->AddInputCharacter('k');
+			break;
+		case SDLK_l:
+			io->AddInputCharacter('l');
+			break;
+		case SDLK_m:
+			io->AddInputCharacter('m');
+			break;
+		case SDLK_n:
+			io->AddInputCharacter('n');
+			break;
+		case SDLK_o:
+			io->AddInputCharacter('o');
+			break;
+		case SDLK_p:
+			io->AddInputCharacter('p');
+			break;
+		case SDLK_q:
+			io->AddInputCharacter('q');
+			break;
+		case SDLK_r:
+			io->AddInputCharacter('r');
+			break;
+		case SDLK_s:
+			io->AddInputCharacter('s');
+			break;
+		case SDLK_t:
+			io->AddInputCharacter('t');
+			break;
+		case SDLK_u:
+			io->AddInputCharacter('u');
+			break;
+		case SDLK_v:
+			io->AddInputCharacter('v');
+			break;
+		case SDLK_w:
+			io->AddInputCharacter('w');
+			break;
+		case SDLK_x:
+			io->AddInputCharacter('x');
+			break;
+		case SDLK_y:
+			io->AddInputCharacter('y');
+			break;
+		case SDLK_z:
+			io->AddInputCharacter('z');
+			break;
+		case SDLK_0:
+			io->AddInputCharacter('0');
+			break;
+		case SDLK_1:
+			io->AddInputCharacter('1');
+			break;
+		case SDLK_2:
+			io->AddInputCharacter('2');
+			break;
+		case SDLK_3:
+			io->AddInputCharacter('3');
+			break;
+		case SDLK_4:
+			io->AddInputCharacter('4');
+			break;
+		case SDLK_5:
+			io->AddInputCharacter('5');
+			break;
+		case SDLK_6:
+			io->AddInputCharacter('6');
+			break;
+		case SDLK_7:
+			io->AddInputCharacter('7');
+			break;
+		case SDLK_8:
+			io->AddInputCharacter('8');
+			break;
+		case SDLK_9:
+			io->AddInputCharacter('9');
+			break;
+		case SDLK_BACKSPACE:
+			memset(scene->buffer, strlen(scene->buffer) - 1, strlen(scene->buffer));
+			cout << strlen(scene->buffer) << endl;
+			break;
 	}
 }
 
 void Application::onKeyUp(SDL_KeyboardEvent event)
 {
+	switch (event.keysym.sym)
+	{
+	case SDLK_LCTRL:
+		scene_saved = false;
+	}
 }
 
 void Application::onGamepadButtonDown(SDL_JoyButtonEvent event)

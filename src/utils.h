@@ -60,15 +60,39 @@ char* fetchBufferVec4(char* data, std::vector<Vector4>& vector);
 bool readJSONBoolean(cJSON* obj, const char* name, float default_value);
 float readJSONNumber(cJSON* obj, const char* name, float default_value);
 std::string readJSONString(cJSON* obj, const char* name, const char* default_str);
-bool readJSONVector(cJSON* obj, const char* name, std::vector<float>& dst);
+bool readJSONFloatVector(cJSON* obj, const char* name, std::vector<float>& dst);
+bool readJSONBooleanVector(cJSON* obj, const char* name, std::vector<bool>& dst);
 Vector3 readJSONVector3(cJSON* obj, const char* name, Vector3 default_value);
 Vector4 readJSONVector4(cJSON* obj, const char* name);
+cJSON* readJSONArrayItem(cJSON* obj, const char* name, int index);
+
+//Populate JSON
+bool populateJSONBooleanArray(cJSON* arr, std::vector<bool>& vtr);
+bool populateJSONStringArray(cJSON* arr, std::vector<std::string>& vtr);
+bool populateJSONIntArray(cJSON* arr, int* vtr, int vtr_size);
+bool populateJSONIntArray(cJSON* arr, std::vector<int>& vtr);
+bool populateJSONFloatArray(cJSON* arr, float* vtr, int vtr_size);
+bool populateJSONFloatArray(cJSON* arr, std::vector<float>& vtr);
+
+//Write JSON
+void writeJSONBoolean(cJSON* obj, const char* name, bool boolean);
+void writeJSONNumber(cJSON* obj, const char* name, float number);
+void writeJSONString(cJSON* obj, const char* name, std::string str);
+void writeJSONBooleanVector(cJSON* obj, const char* name, const int* vtr, int vtr_size);
+void writeJSONBooleanVector(cJSON* obj, const char* name, std::vector<bool>& vtr);
+void writeJSONIntVector(cJSON* obj, const char* name, const int* vtr, int vtr_size);
+void writeJSONIntVector(cJSON* obj, const char* name, std::vector<int>& vtr);
+void writeJSONFloatVector(cJSON* obj, const char* name, const float* vtr, int vtr_size);
+void writeJSONFloatVector(cJSON* obj, const char* name, std::vector<float>& vtr);
+void writeJSONVector3(cJSON* obj, const char* name, Vector3& vtr);
+void writeJSONVector4(cJSON* obj, const char* name, Vector4& vtr);
 
 //Replace JSON
 void replaceJSONBoolean(cJSON* obj, const char* name, bool boolean);
 void replaceJSONNumber(cJSON* obj, const char* name, float number);
 void replaceJSONString(cJSON* obj, const char* name, const char* string);
-void replaceJSONFloatVector(cJSON* obj, const char* name, float* vector, int size);
+void replaceJSONBooleanVector(cJSON* obj, const char* name, std::vector<bool>& vtr);
+void replaceJSONFloatVector(cJSON* obj, const char* name, std::vector<float>& vtr);
 void replaceJSONVector3(cJSON* obj, const char* name, Vector3 vector);
 void replaceJSONVector4(cJSON* obj, const char* name, Vector4 vector);
 

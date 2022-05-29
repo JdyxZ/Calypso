@@ -14,7 +14,7 @@ class Texture;
 //our namespace
 namespace GTR {
 
-	enum eEntityType {
+	enum EntityType {
 		NONE = 0,
 		PREFAB = 1,
 		LIGHT = 2,
@@ -23,7 +23,7 @@ namespace GTR {
 		DECALL = 5
 	};
 
-	enum eLightType {
+	enum LightType {
 		POINT = 0,
 		SPOT = 1,
 		DIRECTIONAL = 2
@@ -43,13 +43,13 @@ namespace GTR {
 	public:
 		Scene* scene;
 		std::string name;
-		eEntityType entity_type;
+		EntityType entity_type;
 		Matrix44 model;
 		bool visible;
 		BaseEntity() { entity_type = NONE; visible = true;}
 		virtual ~BaseEntity() {}
 		virtual void renderInMenu();
-		virtual void configure(cJSON* json) {}
+		virtual void configure(cJSON* json) {};
 	};
 
 	//represents one prefab in the scene
@@ -72,7 +72,7 @@ namespace GTR {
 		//General features
 		Vector3 color;
 		float intensity;
-		eLightType light_type;
+		LightType light_type;
 		float max_distance;
 
 		//Spot Light
@@ -91,7 +91,7 @@ namespace GTR {
 		Camera* light_camera;
 
 		LightEntity();
-		LightEntity(eLightType light_type);
+		LightEntity(LightType light_type);
 		virtual void renderInMenu();
 		virtual void configure(cJSON* json);
 	};
@@ -126,9 +126,15 @@ namespace GTR {
 		bool show_atlas; //Enables or disables the display of the shadow atlas.
 
 		//Scene triggers
-		bool entity_trigger; //Triggers if an entity has changed his visibility or a visible entity has changed its model.
+		bool entity_trigger; //Triggers if an entity has changed its visibility or a visible entity has changed its model.
+		bool prefab_trigger; //Triggers if a new prefab has been added to the scene or an old one has been deleted.
+		bool light_trigger; //Triggers if a new light has been added to the scene or an old one has been deleted.
 		bool shadow_visibility_trigger; //Triggers changes in shadow casting or light visibility for lights that cast shadows.
 		bool shadow_resolution_trigger; //Triggers if shadow resolution has been changed.
+
+		//Input text buffer
+		const static int buffer_size = 25;
+		char buffer[buffer_size] = {};
 
 		Scene();
 
@@ -137,12 +143,16 @@ namespace GTR {
 
 		void clear();
 		void addEntity(BaseEntity* entity);
+		void removeEntity(BaseEntity* entity);
 		std::string nameEntity(std::string default_name);
 		BaseEntity* createEntity(std::string type);
 
 		//JSON methods
 		bool load(const char* filename);
 		bool save();
+
+		//Trigger method
+		void resetTriggers();
 	};
 
 };

@@ -17,6 +17,8 @@ constexpr int SHOW_ATLAS_RESOLUTION = 300;
 using namespace GTR;
 using namespace std;
 
+//<--------------------------------------------------- Support methods --------------------------------------------------->
+
 bool sortRenderCall(const RenderCall* rc1, const RenderCall* rc2)
 {
 	eAlphaMode rc1_alpha = rc1->material->alpha_mode;
@@ -38,11 +40,19 @@ bool sortLight(const LightEntity* l1, const LightEntity* l2)
 
 }
 
-void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
-{	
+//<--------------------------------------------------- Constructor --------------------------------------------------->
+
+Renderer::Renderer(Scene* scene, Camera* camera)
+{
 	//Set current scene and camera
 	this->scene = scene;
+	this->camera = camera;
+}
 
+//< --------------------------------------------------- Scene render --------------------------------------------------->
+
+void Renderer::renderScene()
+{	
 	//Set the clear color (the background color)
 	glClearColor(scene->background_color.x, scene->background_color.y, scene->background_color.z, 1.0);
 
@@ -50,11 +60,53 @@ void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	checkGLErrors();
 
-	//Clear the render calls vector and the lights vector
+	//Set the render calls and lights of the renderer
+	processScene();
+
+	//If there aren't lights in the scene don't render nothing
+	if (lights.empty())
+		return;
+
+	//Update Shadow Atlas: We create a dynamic atlas to be resizable
+	updateShadowAtlas();
+
+	//Compute shadow atlas
+	computeShadowAtlas();
+
+	//Enable view camera after computing shadow maps
+	camera->enable();
+
+	//Final render
+	for (int i = 0; i < render_calls.size(); i++)
+	{
+		//Current render call
+		RenderCall* rc = render_calls[i];
+
+		//If bounding box is inside the camera frustum then the object is probably visible
+		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
+		{
+			renderDrawCall(rc, camera); 	
+		}
+	}
+
+	//Debug shadow maps
+	if (scene->show_atlas) showShadowAtlas();
+
+	//Reset triggers
+	scene->resetTriggers();
+
+}
+
+//< --------------------------------------------------- Scene elements --------------------------------------------------->
+
+//Create or update render calls vector
+void Renderer::processScene()
+{
+	//Clear the render call vector and the light vector
 	render_calls.clear();
 	lights.clear();
 
-	//Generate render calls and fill lights vector
+	//Generate render calls and fill the light vector
 	for (int i = 0; i < scene->entities.size(); ++i)
 	{
 		BaseEntity* ent = scene->entities[i];
@@ -65,108 +117,25 @@ void Renderer::renderScene(GTR::Scene* scene, Camera* camera)
 		if (ent->entity_type == PREFAB)
 		{
 			PrefabEntity* pent = (GTR::PrefabEntity*)ent;
-			if(pent->prefab)
+			if (pent->prefab)
 				processPrefab(ent->model, pent->prefab, camera);
 		}
 
+		//is a light!
 		if (ent->entity_type == LIGHT) {
 			LightEntity* light = (LightEntity*)ent;
 			lights.push_back(light);
 		}
 	}
-
-	//If there aren't lights in the scene don't render nothing
-	if (lights.empty()) return;
+	
 
 	//Now we sort the RenderCalls vector according to the boolean method sortRenderCall
-	if (scene->alpha_sorting) std::sort(render_calls.begin(), render_calls.end(), sortRenderCall);
-
-	//Now we sort the Light vector according to the boolean method sortLight
-	if (scene->shadow_sorting) std::sort(lights.begin(), lights.end(), sortLight);
-
-	//Set shadow resolution
-	if (scene->shadow_resolution_trigger)
-	{
-		string shadow_resolution;
-		shadow_resolution.assign(Application::instance->shadow_resolutions[scene->atlas_resolution_index]);
-		shadow_map_resolution = strtoul(shadow_resolution.substr(0, shadow_resolution.find_first_of(" ")).c_str(), NULL, 10);
-		cout << "Resolution successfully changed" << endl;
-	}
-
-	//Compute the number of shadows of the scene and the shadow index of each light
-	if (scene->shadow_visibility_trigger)
-	{
-		scene->num_shadows = 0;
-		int shadow_index = 0;
-		for (int i = 0; i < lights.size(); i++)
-		{
-			if (lights[i]->cast_shadows)
-			{
-				//Assign a shadow slot for shadow atlas
-				lights[i]->shadow_index = shadow_index;
-
-				//Update
-				scene->num_shadows++;
-				shadow_index++;
-			}
-		}
-	}
-
-	//Create Shadow Atlas: We create a dynamic atlas to be resizable
-	if (scene->shadow_visibility_trigger || scene->shadow_resolution_trigger) createShadowAtlas();
-
-	//Compute Shadow Atlas
-	if (scene->fbo || scene->shadow_atlas)
-	{
-		//Iterate over light vector
-		for (int i = 0; i < lights.size(); i++)
-		{
-			//Current light
-			LightEntity* light = lights[i];
-
-			//Booleans
-			bool compute_spot = light->light_type == SPOT && light->cast_shadows && (scene->entity_trigger || light->spot_shadow_trigger || scene->shadow_visibility_trigger || scene->shadow_resolution_trigger);
-			bool compute_directional = light->light_type == DIRECTIONAL && light->cast_shadows && (scene->entity_trigger || light->directional_shadow_trigger || scene->shadow_visibility_trigger || scene->shadow_resolution_trigger || camera->camera_trigger);
-			
-			//Shadow Map
-			if (compute_spot)
-			{
-				computeSpotShadowMap(light);
-				light->spot_shadow_trigger = false;
-			}
-			if (compute_directional)
-			{
-				computeDirectionalShadowMap(light,camera);
-				light->directional_shadow_trigger = false;
-			}
-		}
-	}
-
-	//Enable view camera after computing shadow maps
-	camera->enable();
-
-	//Final render
-	for (int i = 0; i < render_calls.size(); i++)
-	{
-		RenderCall* rc = render_calls[i];
-		//if bounding box is inside the camera frustum then the object is probably visible
-		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
-		{
-			renderDrawCall(render_calls[i], camera); 	
-		}
-	}
-
-	//Debug shadow maps
-	if (scene->show_atlas) showShadowAtlas();
-
-	//Reset triggers
-	if (scene->entity_trigger) scene->entity_trigger = false;
-	if (scene->shadow_visibility_trigger) scene->shadow_visibility_trigger = false;
-	if (camera->camera_trigger) camera->camera_trigger = false;
-
+	if (scene->alpha_sorting)
+		std::sort(render_calls.begin(), render_calls.end(), sortRenderCall);
+	
 }
 
-//renders all the prefab
+//Renders all the prefab
 void Renderer::processPrefab(const Matrix44& model, GTR::Prefab* prefab, Camera* camera)
 {
 	assert(prefab && "PREFAB IS NULL");
@@ -174,7 +143,7 @@ void Renderer::processPrefab(const Matrix44& model, GTR::Prefab* prefab, Camera*
 	processNode(model, &prefab->root, camera); //For each prefab we render its nodes with the model matrix of the entity that we pass by parameter, which avoids having the same prefab in memory twice.
 }
 
-//renders a node of the prefab and its children
+//Renders a node of the prefab and its children
 void Renderer::processNode(const Matrix44& prefab_model, GTR::Node* node, Camera* camera)
 {
 	if (!node->visible)
@@ -187,15 +156,15 @@ void Renderer::processNode(const Matrix44& prefab_model, GTR::Node* node, Camera
 	if (node->mesh && node->material)
 	{
 		//compute the bounding box of the object in world space (by using the mesh bounding box transformed to world space)
-		BoundingBox world_bounding = transformBoundingBox(node_model,node->mesh->box);
+		BoundingBox world_bounding_box = transformBoundingBox(node_model,node->mesh->box);
 
 		//Create a render call for each node and push it back in the RenderCalls vector
 		RenderCall* rc = new RenderCall();
 		rc->mesh = node->mesh;
 		rc->material = node->material;
 		rc->model = node_model;
-		rc->world_bounding_box = world_bounding;
-		rc->distance_to_camera = world_bounding.center.distance(camera->center);
+		rc->world_bounding_box = world_bounding_box;
+		rc->distance_to_camera = world_bounding_box.center.distance(camera->center);
 		render_calls.push_back(rc);
 
 	}
@@ -204,6 +173,8 @@ void Renderer::processNode(const Matrix44& prefab_model, GTR::Node* node, Camera
 	for (int i = 0; i < node->children.size(); ++i)
 		processNode(prefab_model, node->children[i], camera);
 }
+
+//< --------------------------------------------------- Forward pipeline --------------------------------------------------->
 
 //Render a draw call
 void GTR::Renderer::renderDrawCall(RenderCall* rc, Camera* camera)
@@ -273,7 +244,7 @@ void GTR::Renderer::renderDrawCall(RenderCall* rc, Camera* camera)
 	//if(occlusion_texture) shader->setTexture("u_occlussion_texture", occlusion_texture, 4);
 
 	//Upload scene uniforms
-	shader->setUniform("u_model", rc->model);
+	shader->setMatrix44("u_model", rc->model);
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
 	shader->setUniform("u_color", rc->material->color);
@@ -292,59 +263,6 @@ void GTR::Renderer::renderDrawCall(RenderCall* rc, Camera* camera)
 		MultiPassLoop(rc->mesh, shader);
 		break;
 	}
-}
-
-//Render basic draw call
-void GTR::Renderer::renderDepthMap(RenderCall* rc, Camera* light_camera)
-{
-	//In case there is nothing to do
-	if (!rc->mesh || !rc->mesh->getNumVertices() || !rc->material)
-		return;
-	assert(glGetError() == GL_NO_ERROR);
-
-	//Define locals to simplify coding
-	Shader* shader = NULL;
-
-	//Select whether to render both sides of the triangles
-	if (rc->material->two_sided) glDisable(GL_CULL_FACE);
-	else glEnable(GL_CULL_FACE);
-	assert(glGetError() == GL_NO_ERROR);
-
-	//Render the inner face of the triangles in order to reduce shadow acne
-	/*glEnable(GL_CULL_FACE);
-	glFrontFace(GL_CW);
-	assert(glGetError() == GL_NO_ERROR);*/
-
-	//chose a shader
-	shader = Shader::Get("depth");
-	assert(glGetError() == GL_NO_ERROR);
-
-	//no shader? then nothing to render
-	if (!shader)
-		return;
-	shader->enable();
-
-	//Upload scene uniforms
-	shader->setUniform("u_model", rc->model);
-	shader->setUniform("u_viewprojection", light_camera->viewprojection_matrix);
-	shader->setUniform("u_alpha_cutoff", rc->material->alpha_mode == GTR::eAlphaMode::MASK ? rc->material->alpha_cutoff : 0); //this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
-
-	//Disable blending
-	glDepthFunc(GL_LESS);
-	glDisable(GL_BLEND);
-
-	//do the draw call that renders the mesh into the screen
-	rc->mesh->render(GL_TRIANGLES);
-
-	//disable shader
-	shader->disable();
-
-	//Reset
-	/*
-	glDisable(GL_CULL_FACE);
-	glFrontFace(GL_CCW);
-	*/
-
 }
 
 //Singlepass lighting
@@ -423,19 +341,15 @@ void GTR::Renderer::SinglePassLoop(Mesh* mesh, Shader* shader)
 			//Specific light properties
 			switch (light->light_type)
 			{
-				case(eLightType::POINT):
+				case(LightType::POINT):
 					lights_type[j] = light->light_type;
 					break;
-				case (eLightType::SPOT):
-					if ((light->cone_angle < 2.0 && light->cone_angle > -2.0) || light->cone_angle < -90.0 || light->cone_angle > 90.0) lights_type[j] = eLightType::POINT;
-					else
-					{
-						spots_direction[j] = light->model.rotateVector(Vector3(0, 0, -1));
-						spots_cone[j] = Vector2(light->cone_exp, cos(light->cone_angle * DEG2RAD));
-						lights_type[j] = light->light_type;
-					}
+				case (LightType::SPOT):
+					spots_direction[j] = light->model.rotateVector(Vector3(0, 0, -1));
+					spots_cone[j] = Vector2(light->cone_exp, cos(light->cone_angle * DEG2RAD));
+					lights_type[j] = light->light_type;
 					break;
-				case (eLightType::DIRECTIONAL):
+				case (LightType::DIRECTIONAL):
 					directionals_front[j] = light->model.rotateVector(Vector3(0, 0, -1));
 					lights_type[j] = light->light_type;
 					break;
@@ -534,10 +448,10 @@ void GTR::Renderer::MultiPassLoop(Mesh* mesh, Shader* shader)
 		//Specific light uniforms
 		switch (light->light_type)
 		{
-		case(eLightType::POINT):
+		case(LightType::POINT):
 			shader->setUniform("u_light_type", 0);
 			break;
-		case (eLightType::SPOT):
+		case (LightType::SPOT):
 			if ((light->cone_angle < 2.0 && light->cone_angle > -2.0) || light->cone_angle < -90.0 || light->cone_angle > 90.0) shader->setUniform("u_light_type", 0);
 			else
 			{
@@ -546,7 +460,7 @@ void GTR::Renderer::MultiPassLoop(Mesh* mesh, Shader* shader)
 				shader->setUniform("u_light_type", 1);
 			}
 			break;
-		case (eLightType::DIRECTIONAL):
+		case (LightType::DIRECTIONAL):
 			shader->setVector3("u_directional_front", light->model.rotateVector(Vector3(0, 0, -1)));
 			shader->setUniform("u_area_size", light->area_size);
 			shader->setUniform("u_light_type", 2);
@@ -580,28 +494,93 @@ void GTR::Renderer::MultiPassLoop(Mesh* mesh, Shader* shader)
 	glDepthFunc(GL_LESS);
 }
 
-//Create a shadow atlas
-void GTR::Renderer::createShadowAtlas()
+// <--------------------------------------------------- Shadows --------------------------------------------------->
+
+//Create or update a shadow atlas
+void GTR::Renderer::updateShadowAtlas()
 {
-	//Delete the former atlas and continue
-	if (scene->fbo)
+	//Compute the number of shadows of the scene and the shadow index of each light in the scene
+	if (scene->shadow_visibility_trigger || scene->light_trigger)
 	{
-		delete scene->fbo;
-		scene->fbo = NULL;
-		scene->shadow_atlas = NULL;
+		scene->num_shadows = 0;
+		int shadow_index = 0;
+		for (int i = 0; i < lights.size(); i++)
+		{
+			if (lights[i]->cast_shadows)
+			{
+				//Assign a shadow slot for shadow atlas
+				lights[i]->shadow_index = shadow_index;
 
-		if (scene->num_shadows == 0)
-			return;
-
+				//Update
+				scene->num_shadows++;
+				shadow_index++;
+			}
+		}
 	}
 
-	//New shadow atlas
-	scene->fbo = new FBO();
-	scene->fbo->setDepthOnly(shadow_map_resolution * scene->num_shadows, shadow_map_resolution); //We create it wide in order to save memory space and improve shadow map management
-	scene->shadow_atlas = scene->fbo->depth_texture;
+	//Set or update shadow resolution
+	if (scene->shadow_resolution_trigger)
+	{
+		string shadow_resolution;
+		shadow_resolution.assign(Application::instance->shadow_resolutions[scene->atlas_resolution_index]);
+		shadow_map_resolution = strtoul(shadow_resolution.substr(0, shadow_resolution.find_first_of(" ")).c_str(), NULL, 10);
+		cout << "Resolution successfully changed" << endl;
+	}
+
+	//Create or update the shadow atlas
+	if (scene->shadow_visibility_trigger || scene->shadow_resolution_trigger || scene->light_trigger)
+	{
+		//Delete the former atlas and continue
+		if (scene->fbo)
+		{
+			delete scene->fbo;
+			scene->fbo = NULL;
+			scene->shadow_atlas = NULL;
+
+			if (scene->num_shadows == 0)
+				return;
+
+		}
+
+		//New shadow atlas
+		scene->fbo = new FBO();
+		scene->fbo->setDepthOnly(shadow_map_resolution * scene->num_shadows, shadow_map_resolution); //We create it wide in order to save memory space and improve shadow map management
+		scene->shadow_atlas = scene->fbo->depth_texture;
+	}
+
 }
 
-//Compute spot shadow map into the shadow atlas
+//Compute the shadow atlas for each light of the scene
+void GTR::Renderer::computeShadowAtlas()
+{
+	if (scene->fbo && scene->shadow_atlas)
+	{
+		//Iterate over light vector
+		for (int i = 0; i < lights.size(); i++)
+		{
+			//Current light
+			LightEntity* light = lights[i];
+
+			//Booleans
+			bool compute_spot = light->light_type == SPOT && light->cast_shadows && (scene->prefab_trigger || scene->light_trigger || scene->entity_trigger || light->spot_shadow_trigger || scene->shadow_visibility_trigger || scene->shadow_resolution_trigger);
+			bool compute_directional = light->light_type == DIRECTIONAL && light->cast_shadows && (scene->prefab_trigger || scene->light_trigger || scene->entity_trigger || light->directional_shadow_trigger || scene->shadow_visibility_trigger || scene->shadow_resolution_trigger || camera->camera_trigger);
+
+			//Shadow Maps
+			if (compute_spot)
+			{
+				computeSpotShadowMap(light);
+				light->spot_shadow_trigger = false;
+			}
+			if (compute_directional)
+			{
+				computeDirectionalShadowMap(light, camera);
+				light->directional_shadow_trigger = false;
+			}
+		}
+	}
+}
+
+//Compute spot shadow maps into the shadow atlas
 void GTR::Renderer::computeSpotShadowMap(LightEntity* light)
 {
 	//Speed boost
@@ -647,7 +626,9 @@ void GTR::Renderer::computeSpotShadowMap(LightEntity* light)
 
 	for (int i = 0; i < render_calls.size(); ++i)
 	{
+		//Current render call
 		RenderCall* rc = render_calls[i];
+
 		if (rc->material->alpha_mode == eAlphaMode::BLEND)
 			continue;
 
@@ -732,6 +713,59 @@ void GTR::Renderer::computeDirectionalShadowMap(LightEntity* light, Camera* came
 
 }
 
+//Render teh depth map
+void GTR::Renderer::renderDepthMap(RenderCall* rc, Camera* light_camera)
+{
+	//In case there is nothing to do
+	if (!rc->mesh || !rc->mesh->getNumVertices() || !rc->material)
+		return;
+	assert(glGetError() == GL_NO_ERROR);
+
+	//Define locals to simplify coding
+	Shader* shader = NULL;
+
+	//Select whether to render both sides of the triangles
+	if (rc->material->two_sided) glDisable(GL_CULL_FACE);
+	else glEnable(GL_CULL_FACE);
+	assert(glGetError() == GL_NO_ERROR);
+
+	//Render the inner face of the triangles in order to reduce shadow acne
+	/*glEnable(GL_CULL_FACE);
+	glFrontFace(GL_CW);
+	assert(glGetError() == GL_NO_ERROR);*/
+
+	//chose a shader
+	shader = Shader::Get("depth");
+	assert(glGetError() == GL_NO_ERROR);
+
+	//no shader? then nothing to render
+	if (!shader)
+		return;
+	shader->enable();
+
+	//Upload scene uniforms
+	shader->setMatrix44("u_model", rc->model);
+	shader->setUniform("u_viewprojection", light_camera->viewprojection_matrix);
+	shader->setUniform("u_alpha_cutoff", rc->material->alpha_mode == GTR::eAlphaMode::MASK ? rc->material->alpha_cutoff : 0); //this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
+
+	//Disable blending
+	glDepthFunc(GL_LESS);
+	glDisable(GL_BLEND);
+
+	//do the draw call that renders the mesh into the screen
+	rc->mesh->render(GL_TRIANGLES);
+
+	//disable shader
+	shader->disable();
+
+	//Reset
+	/*
+	glDisable(GL_CULL_FACE);
+	glFrontFace(GL_CCW);
+	*/
+
+}
+
 //Print shadow map in the screen
 void GTR::Renderer::showShadowAtlas()
 {
@@ -783,6 +817,7 @@ void GTR::Renderer::showShadowAtlas()
 
 }
 
+//Cubemap texture
 Texture* GTR::CubemapFromHDRE(const char* filename)
 {
 	HDRE* hdre = HDRE::Get(filename);
