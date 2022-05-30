@@ -143,9 +143,9 @@ void Application::update(double seconds_elapsed)
 	if (Input::isKeyPressed(SDL_SCANCODE_LSHIFT)) speed *= 10; //move faster with left shift
 
 	//mouse input to rotate the cam
-	#ifndef SKIP_IMGUI
+#ifndef SKIP_IMGUI
 	if (!ImGuizmo::IsUsing())
-	#endif
+#endif
 	{
 		if (mouse_locked || Input::mouse_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) //move in first person view
 		{
@@ -157,9 +157,9 @@ void Application::update(double seconds_elapsed)
 		else //orbit around center
 		{
 			bool mouse_blocked = false;
-			#ifndef SKIP_IMGUI
-						mouse_blocked = ImGui::IsAnyWindowHovered() || ImGui::IsAnyItemHovered() || ImGui::IsAnyItemActive();
-			#endif
+#ifndef SKIP_IMGUI
+			mouse_blocked = ImGui::IsAnyWindowHovered() || ImGui::IsAnyItemHovered() || ImGui::IsAnyItemActive();
+#endif
 			if (Input::mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT) && !mouse_blocked) //is left button pressed?
 			{
 				camera->orbit(-Input::mouse_delta.x * orbit_speed, Input::mouse_delta.y * orbit_speed);
@@ -173,16 +173,16 @@ void Application::update(double seconds_elapsed)
 	if (Input::isKeyPressed(SDL_SCANCODE_S) && !Input::isKeyPressed(SDL_SCANCODE_LCTRL)) camera->move(Vector3(0.0f, 0.0f, -1.0f) * speed), camera->camera_trigger = true;
 	if (Input::isKeyPressed(SDL_SCANCODE_A)) camera->move(Vector3(1.0f, 0.0f, 0.0f) * speed), camera->camera_trigger = true;
 	if (Input::isKeyPressed(SDL_SCANCODE_D)) camera->move(Vector3(-1.0f, 0.0f, 0.0f) * speed), camera->camera_trigger = true;
-	
+
 	//Move up or down the camera using Q and E
 	if (Input::isKeyPressed(SDL_SCANCODE_Q)) camera->moveGlobal(Vector3(0.0f, -1.0f, 0.0f) * speed), camera->camera_trigger = true;
 	if (Input::isKeyPressed(SDL_SCANCODE_E)) camera->moveGlobal(Vector3(0.0f, 1.0f, 0.0f) * speed), camera->camera_trigger = true;
 
 	//to navigate with the mouse fixed in the middle
 	SDL_ShowCursor(!mouse_locked);
-	#ifndef SKIP_IMGUI
-		ImGui::SetMouseCursor(mouse_locked ? ImGuiMouseCursor_None : ImGuiMouseCursor_Arrow);
-	#endif
+#ifndef SKIP_IMGUI
+	ImGui::SetMouseCursor(mouse_locked ? ImGuiMouseCursor_None : ImGuiMouseCursor_Arrow);
+#endif
 	if (mouse_locked)
 	{
 		Input::centerMouse();

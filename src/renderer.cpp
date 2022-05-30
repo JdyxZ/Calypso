@@ -67,6 +67,13 @@ void Renderer::renderScene()
 	if (lights.empty())
 		return;
 
+	//Create a new shader
+	Shader* shader = getShader();
+
+	//no shader? then nothing to render
+	if (!shader)
+		return;
+
 	//Update Shadow Atlas: We create a dynamic atlas to be resizable
 	updateShadowAtlas();
 
@@ -76,18 +83,27 @@ void Renderer::renderScene()
 	//Enable view camera after computing shadow maps
 	camera->enable();
 
-	//Final render
+	//Enable the shader
+	shader->enable();
+
+	//Set scene uniforms in the shader
+	setSceneUniforms(shader);
+
+	//Send the render calls to the GPU
 	for (int i = 0; i < render_calls.size(); i++)
 	{
 		//Current render call
 		RenderCall* rc = render_calls[i];
 
-		//If bounding box is inside the camera frustum then the object is probably visible
+		//If bounding box is inside the camera frustum then the prefab is probably visible
 		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
 		{
-			renderDrawCall(rc, camera); 	
+			renderDrawCall(shader, rc, camera); 	
 		}
 	}
+
+	//Disable the shader
+	shader->disable();
 
 	//Debug shadow maps
 	if (scene->show_atlas) showShadowAtlas();
@@ -176,16 +192,46 @@ void Renderer::processNode(const Matrix44& prefab_model, GTR::Node* node, Camera
 
 //< --------------------------------------------------- Forward pipeline --------------------------------------------------->
 
+//Shader
+Shader* GTR::Renderer::getShader()
+{
+	//Define locals to simplify coding
+	Shader* shader = NULL;
+
+	//Choose a shader to render the scene with
+	switch (scene->render_type) {
+	case(Singlepass):
+		shader = Shader::Get("singlepass");
+		break;
+	case(Multipass):
+		shader = Shader::Get("multipass");
+		break;
+	}
+	assert(glGetError() == GL_NO_ERROR);
+
+	return shader;
+}
+
+//Scene uniforms
+void GTR::Renderer::setSceneUniforms(Shader* shader) 
+{
+	//Upload scene uniforms
+	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	shader->setUniform("u_camera_position", camera->eye);
+	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_occlusion", scene->occlusion);
+	shader->setUniform("u_specular_light", scene->specular_light);
+	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+}
+
 //Render a draw call
-void GTR::Renderer::renderDrawCall(RenderCall* rc, Camera* camera)
+void GTR::Renderer::renderDrawCall(Shader* shader, RenderCall* rc, Camera* camera)
 {
 	//In case there is nothing to do
 	if (!rc->mesh || !rc->mesh->getNumVertices() || !rc->material)
 		return;
 	assert(glGetError() == GL_NO_ERROR);
-
-	//Define locals to simplify coding
-	Shader* shader = NULL;
 
 	//Textures
 	Texture* color_texture = NULL;
@@ -220,22 +266,6 @@ void GTR::Renderer::renderDrawCall(RenderCall* rc, Camera* camera)
 	else glEnable(GL_CULL_FACE);
 	assert(glGetError() == GL_NO_ERROR);
 
-	//chose a shader
-	switch (scene->render_type) {
-	case(Singlepass):
-		shader = Shader::Get("singlepass");
-		break;
-	case(Multipass):
-		shader = Shader::Get("multipass");
-		break;
-	}
-	assert(glGetError() == GL_NO_ERROR);
-
-	//no shader? then nothing to render
-	if (!shader)
-		return;
-	shader->enable();
-
 	//Upload textures
 	if(color_texture) shader->setTexture("u_color_texture", color_texture, 0);
 	if (scene->emissive_materials) shader->setTexture("u_emissive_texture", emissive_texture, 1);
@@ -243,30 +273,24 @@ void GTR::Renderer::renderDrawCall(RenderCall* rc, Camera* camera)
 	if (scene->normal_mapping && normal_texture) shader->setTexture("u_normal_texture", normal_texture, 3);
 	//if(occlusion_texture) shader->setTexture("u_occlussion_texture", occlusion_texture, 4);
 
-	//Upload scene uniforms
+	//Upload prefab uniforms
 	shader->setMatrix44("u_model", rc->model);
-	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
-	shader->setUniform("u_camera_position", camera->eye);
 	shader->setUniform("u_color", rc->material->color);
-	shader->setUniform("u_time", getTime());
 	shader->setUniform("u_alpha_cutoff", rc->material->alpha_mode == GTR::eAlphaMode::MASK ? rc->material->alpha_cutoff : 0); //this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
-	shader->setUniform("u_ambient_light", scene->ambient_light);
 	shader->setUniform("u_normal_mapping", entity_has_normal_map);
-	shader->setUniform("u_occlusion", scene->occlusion);
-	shader->setUniform("u_specular_light", scene->specular_light);
 
 	switch (scene->render_type) {
 	case(Singlepass):
-		SinglePassLoop(rc->mesh, shader);
+		SinglePassLoop(shader, rc->mesh);
 		break;
 	case(Multipass):
-		MultiPassLoop(rc->mesh, shader);
+		MultiPassLoop(shader, rc->mesh);
 		break;
 	}
 }
 
 //Singlepass lighting
-void GTR::Renderer::SinglePassLoop(Mesh* mesh, Shader* shader)
+void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh)
 {
 	//Blending support
 	glDepthFunc(GL_LEQUAL);
@@ -388,18 +412,12 @@ void GTR::Renderer::SinglePassLoop(Mesh* mesh, Shader* shader)
 		shader->setUniform1Array("u_shadows_index", &shadows_index[0], num_lights);
 		shader->setUniform1Array("u_shadows_bias", &shadows_bias[0], num_lights);
 		shader->setMatrix44Array("u_shadows_vp", &shadows_vp[0], num_lights);
-		shader->setUniform("u_num_shadows", (float)scene->num_shadows);
 
 		//Shadow Atlas
 		if (scene->shadow_atlas) 
-		{
-			shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 			shader->setUniform("u_shadows", 1);
-		}
 		else
-		{
 			shader->setUniform("u_shadows", 0);
-		}
 
 		//do the draw call that renders the mesh into the screen
 		mesh->render(GL_TRIANGLES);
@@ -409,8 +427,6 @@ void GTR::Renderer::SinglePassLoop(Mesh* mesh, Shader* shader)
 		final_light = min(max_num_lights + final_light, lights_size - 1);
 
 	}
-	//disable shader
-	shader->disable();
 
 	//set the render state as it was before to avoid problems with future renders
 	glDisable(GL_BLEND);
@@ -418,7 +434,7 @@ void GTR::Renderer::SinglePassLoop(Mesh* mesh, Shader* shader)
 }
 
 //Multipass lighting
-void GTR::Renderer::MultiPassLoop(Mesh* mesh, Shader* shader)
+void GTR::Renderer::MultiPassLoop(Shader* shader, Mesh* mesh)
 {
 	//Blending support
 	glDepthFunc(GL_LEQUAL);
@@ -474,8 +490,6 @@ void GTR::Renderer::MultiPassLoop(Mesh* mesh, Shader* shader)
 			shader->setUniform("u_shadow_index", (float)light->shadow_index);
 			shader->setUniform("u_shadow_bias", light->shadow_bias);
 			shader->setMatrix44("u_shadow_vp", light->light_camera->viewprojection_matrix);
-			shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
-			shader->setUniform("u_num_shadows", (float)scene->num_shadows);
 		}
 		else
 		{
@@ -485,9 +499,6 @@ void GTR::Renderer::MultiPassLoop(Mesh* mesh, Shader* shader)
 		//do the draw call that renders the mesh into the screen
 		mesh->render(GL_TRIANGLES);
 	}
-
-	//disable shader
-	shader->disable();
 
 	//set the render state as it was before to avoid problems with future renders
 	glDisable(GL_BLEND);
