@@ -98,8 +98,6 @@ bool FBO::setTextures(std::vector<Texture*> textures, Texture* depth_texture, in
 	assert(textures.size() >= 0 && textures.size() <= 4);
 	assert(glGetError() == GL_NO_ERROR);
 	assert(textures.size() || depth_texture ); //at least one texture
-	int format = 0; //RGB,RGBA
-	int type = 0;//UNSIGNED_BYTE
 	if (textures.size())
 	{
 		width = (int)textures[0]->width;

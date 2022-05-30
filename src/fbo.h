@@ -16,6 +16,8 @@ public:
 	GLenum bufs[4];
 	int width;
 	int height;
+	int format;
+	int type;
 	bool owns_textures;
 
 	GLuint renderbuffer_color;

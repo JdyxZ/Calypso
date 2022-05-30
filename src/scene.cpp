@@ -17,7 +17,6 @@ GTR::Scene::Scene()
 	main_camera = NULL;
 
 	//Shadow Atlas
-	fbo = NULL;
 	shadow_atlas = NULL;
 
 	//Scene properties
@@ -26,9 +25,14 @@ GTR::Scene::Scene()
 	occlusion = true;
 	specular_light = true;
 	normal_mapping = true;
+	render_pipeline = Deferred;
 	render_type = Singlepass;
 	shadow_sorting = false;
 	num_shadows = 0;
+
+	//GBuffers debugging
+	show_gbuffers = false;
+	toggle_gbuffers = false;
 
 	//Shadow atlas debugging
 	atlas_resolution_index = 2; //Set by default 2048 x 2048 resolution

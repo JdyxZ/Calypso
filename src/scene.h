@@ -29,6 +29,11 @@ namespace GTR {
 		DIRECTIONAL = 2
 	};
 
+	enum RenderPipeline {
+		Forward = 0,
+		Deferred = 1
+	};
+
 	enum RenderType {
 		Singlepass = 0,
 		Multipass = 1,
@@ -107,7 +112,6 @@ namespace GTR {
 		Camera* main_camera;
 
 		//Scene shadows
-		FBO* fbo; //Frame Buffer Object
 		Texture* shadow_atlas; //Shadow map of the lights of the scene
 
 		//Scene properties
@@ -116,9 +120,14 @@ namespace GTR {
 		bool occlusion; //Whether we enable prefab's occlusion texture or not.
 		bool specular_light; //Whether we enable prefab's roughness metallic texture or not.
 		bool normal_mapping; //Whether we are redering with normal map or interpolated normals.
+		int render_pipeline; //Whether we are rendering with forward or deferred pipeline. By deafult we set the flag to Deferred.
 		int render_type; //Whether we are rendering with Single Pass or Multi Pass. By deafult we set the flag to Single Pass.
 		bool shadow_sorting; //Whether we sort light by shadows or not.
 		int num_shadows; //The number of shadows in the scene.
+
+		//GBuffers
+		bool show_gbuffers;
+		bool toggle_gbuffers;
 
 		//Shadow atlas
 		int atlas_resolution_index; //The corresponding index in the array of shadow atlas resolutions

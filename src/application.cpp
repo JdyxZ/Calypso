@@ -92,7 +92,7 @@ Application::Application(int window_width, int window_height, SDL_Window* window
 		exit(1);
 
 	//This class will be the one in charge of rendering all 
-	renderer = new GTR::Renderer(scene, camera); //here so we have opengl ready in constructor
+	renderer = new GTR::Renderer(scene, camera, window_width, window_height); //here so we have opengl ready in constructor
 
 	//hide the cursor
 	SDL_ShowCursor(!mouse_locked); //hide or show the mouse
@@ -104,9 +104,6 @@ void Application::render(void)
 	//be sure no errors present in opengl before start
 	checkGLErrors();
 
-	//set the camera as default (used by some functions in the framework)
-	camera->enable();
-
 	//set default flags
 	glDisable(GL_BLEND);
     
@@ -117,10 +114,6 @@ void Application::render(void)
 	else
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-	//lets render something
-	//Matrix44 model;
-	//renderer->renderPrefab( model, prefab, camera );
-
 	//Render the scene
 	renderer->renderScene();
 
@@ -128,10 +121,13 @@ void Application::render(void)
 	if(render_grid)
 		drawGrid();
 
+	//Render anything in the gui after this
     glDisable(GL_DEPTH_TEST);
-    //render anything in the gui after this
 
-	//the swap buffers is done in the main loop after this function
+	//Reset triggers
+	scene->resetTriggers();
+
+	//The swap buffers is done in the main loop after this function
 }
 
 void Application::update(double seconds_elapsed)
@@ -290,11 +286,17 @@ void Application::renderDebugGUI(void)
 	ImGui::Checkbox("Occlussion texture", &scene->occlusion);
 	ImGui::Checkbox("Specular light", &scene->specular_light);
 	ImGui::Checkbox("Normal map", &scene->normal_mapping);
-	ImGui::Checkbox("Shadow atlas", &scene->show_atlas);
+	ImGui::Checkbox("Shadow Atlas", &scene->show_atlas);
 	ImGui::Checkbox("Shadow sorting", &scene->shadow_sorting);
+
+	if(scene->render_pipeline == GTR::RenderPipeline::Deferred)
+		ImGui::Checkbox("GBuffers", &scene->show_gbuffers);
 
 	//Shadow resolution
 	scene->shadow_resolution_trigger = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, shadow_resolutions, IM_ARRAYSIZE(shadow_resolutions));
+
+	//Render pipeline
+	ImGui::Combo("Render Pipelne", (int*)&scene->render_pipeline, "Forward\0Deferred", 2);
 
 	//Render type
 	switch (scene->render_type) {
@@ -415,6 +417,9 @@ void Application::onKeyDown( SDL_KeyboardEvent event )
 			break;
 		case SDLK_RIGHT:
 			scene->atlas_scope++;
+			break;
+		case SDLK_TAB:
+			scene->toggle_gbuffers = !scene->toggle_gbuffers;
 			break;
 		case SDLK_a:
 			io->AddInputCharacter('a');
@@ -600,5 +605,6 @@ void Application::onResize(int width, int height)
 	camera->aspect =  width / (float)height;
 	window_width = width;
 	window_height = height;
+	renderer->window_size = Vector2(width, height);
 }
 
