@@ -9,6 +9,8 @@ deferred quad.vs deferred.fs
 
 
 \methods
+#define RECIPROCAL_PI 0.3183098861837697
+#define PI 3.14159265359
 
 mat3 cotangent_frame(in vec3 N, in vec3 p, in vec2 uv)
 {
@@ -73,18 +75,82 @@ float testShadowMap(in float shadow_index, in float num_shadows,in float shadows
 	//Return shadow factor
 	return shadow_factor;
 }
-vec3 PhongEquation(in vec3 light_color, in vec3 light_vector, in float light_intensity, in float light_distance, in float light_max_distance, in bool light_attenuation, in bool specular_light, in vec3 normal_vector, in vec3 omr, in vec3 worldpos, in vec3 camera_position, in bool cast_shadows, in float shadow_index, in float num_shadows, in float shadow_bias, in mat4 shadow_vp, in sampler2D shadow_atlas)
+
+float D_GGX (	const in float NoH, const in float linearRoughness )
+{
+	float a2 = linearRoughness * linearRoughness;
+	float f = (NoH * NoH) * (a2 - 1.0) + 1.0;
+	return a2 / (PI * f * f);
+}
+
+// Fresnel term with colorized fresnel
+vec3 F_Schlick( const in float VoH, const in vec3 f0)
+{
+	float f = pow(1.0 - VoH, 5.0);
+	return f0 + (vec3(1.0) - f0) * f;
+}
+
+float GGX(float NdotV, float k){
+	return NdotV / (NdotV * (1.0 - k) + k);
+}
+	
+float G_Smith( float NdotV, float NdotL, float roughness)
+{
+	float k = pow(roughness + 1.0, 2.0) / 8.0;
+	return GGX(NdotL, k) * GGX(NdotV, k);
+}
+
+
+vec3 specularBRDF( float roughness, vec3 f0, float NoH, float NoV, float NoL, float LoH )
+{
+	float a = roughness * roughness;
+
+	// Normal Distribution Function
+	float D = D_GGX( NoH, a );
+
+	// Fresnel Function
+	vec3 F = F_Schlick( LoH, f0 );
+
+	// Visibility Function (shadowing/masking)
+	float G = G_Smith( NoV, NoL, roughness );
+		
+	// Norm factor
+	vec3 spec = D * G * F;
+	spec /= (4.0 * NoL * NoV + 1e-6);
+
+	return spec;
+}
+
+
+float Fd_Burley ( const in float NoV, const in float NoL, const in float LoH, 
+const in float linearRoughness)
+{
+        float f90 = 0.5 + 2.0 * linearRoughness * LoH * LoH;
+        float lightScatter = F_Schlick(NoL, f90);
+        float viewScatter  = F_Schlick(NoV, f90);
+        return lightScatter * viewScatter * RECIPROCAL_PI;
+}
+
+
+
+vec3 PhongEquation(in vec4 baseColor,in vec3 light_color, in vec3 light_vector, in float light_intensity, in float light_distance, in float light_max_distance, in bool light_attenuation, in bool specular_light, in vec3 normal_vector, in vec3 omr, in vec3 worldpos, in vec3 camera_position, in bool cast_shadows, in float shadow_index, in float num_shadows, in float shadow_bias, in mat4 shadow_vp, in sampler2D shadow_atlas)
 	{
 		vec3 L = light_vector;
 		vec3 N = normal_vector;
 		vec3 R = reflect(-L, N);
 		vec3 V = camera_position - worldpos;
+		vec3 H = (V + L) - worldpos;
+
 	    R = normalize(R);
 	    V = normalize(V);
+	    H = normalize(H);
 
 	    //Compute dot products
 	    float NdotL = clamp(dot(N,L), 0.0, 1.0);
 	    float RdotV = clamp(dot(R,V), 0.0, 1.0);
+	    float NdotH = clamp(dot(N,H), 0.0, 1.0);
+	    float NdotV = clamp(dot(N,V), 0.0, 1.0);
+	    float LdotH = clamp(dot(L,H), 0.0, 1.0);
 
 	    //Shadow factor
 		float shadow_factor = 1.0;
@@ -92,6 +158,7 @@ vec3 PhongEquation(in vec3 light_color, in vec3 light_vector, in float light_int
 
 	    //Compute attenuation factor
 	    float attenuation_factor = 1.0;
+
 	    if(light_attenuation)
 	    {
 		    light_max_distance = max(light_max_distance,0.0);
@@ -103,13 +170,29 @@ vec3 PhongEquation(in vec3 light_color, in vec3 light_vector, in float light_int
 	    //Compute shininess factor
 	    float shininess_factor = omr.y * 20.0; //Multiply roughness by a float to reduce specular inaccuracy
 
+
+
 	    //Compute light factors
-	    float diffuse_factor = attenuation_factor * NdotL;
+	    //float diffuse_factor = attenuation_factor * NdotL;
+
+		//we compute the reflection in base to the color and the metalness
+		vec3 f0 = mix( vec3(0.5), baseColor.xyz, omr.y);
+
+		//metallic materials do not have diffuse
+		vec3 diffuseColor = (1.0 - omr.y) * baseColor.xyz;
+
+		// linearRoughness = squared roughness
+		vec3 diffuse_factor = diffuseColor * attenuation_factor * NdotL;
+
 	    float specular_factor = 0.0;
-	    if(specular_light) specular_factor = attenuation_factor * omr.z * pow(RdotV, shininess_factor); 
+	    if(specular_light) {
+	    	//specular_factor = attenuation_factor * omr.z * pow(RdotV, shininess_factor);
+			//compute the specular
+			vec3 specular_factor = specularBRDF( omr.z, f0, NdotH, NdotV, NdotL, LdotH);
+	    } 
 
 	    //Phong equation
-		vec3 light = (diffuse_factor + specular_factor) * light_color * light_intensity * shadow_factor;
+		vec3 light = ((diffuse_factor * NdotL) + (specular_factor / NdotL)) * light_color * light_intensity * shadow_factor;
 
 		//Return light
 		return light;
@@ -303,7 +386,7 @@ void main()
 		light_vector /= light_distance;
 
 		//Phong Equation
-		phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, worldpos, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		phong_light += PhongEquation(color, u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, worldpos, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
 
 	}
 	else if(u_light_type == 1)//spot light
@@ -330,7 +413,7 @@ void main()
 			light_intensity *= pow(spot_cosine,max(u_spot_cone.x,0.0));
 
 			//Phong Equation
-			phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, worldpos, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+			phong_light += PhongEquation(color, u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, worldpos, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
 		} 
 	}
 	else if(u_light_type == 2) //directional light
@@ -345,7 +428,7 @@ void main()
 		light_vector /= light_distance;
 
 		//Phong Equation
-		phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, false, u_specular_light, normal_vector, omr, worldpos, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		phong_light += PhongEquation(color, u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, false, u_specular_light, normal_vector, omr, worldpos, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
 	}	
 
 	//Final color
@@ -463,7 +546,7 @@ void main()
 				light_vector /= light_distance;
 
 				//Phong Equation
-				phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+				phong_light += PhongEquation(color, u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
 
 			}
 			else if(u_lights_type[i] == 1)//spot light
@@ -490,7 +573,7 @@ void main()
 					light_intensity *= pow(spot_cosine,max(u_spots_cone[i].x,0.0));
 
 					//Phong Equation
-					phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+					phong_light += PhongEquation(color, u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
 				}
 
 			}
@@ -506,7 +589,7 @@ void main()
 				light_vector /= light_distance;
 
 				//Phong Equation
-				phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], false, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+				phong_light += PhongEquation(color, u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], false, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
 			}			
 		}
 	}
@@ -619,7 +702,7 @@ void main()
 		light_vector /= light_distance;
 
 		//Phong Equation
-		phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		phong_light += PhongEquation(color, u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
 
 	}
 	else if(u_light_type == 1)//spot light
@@ -646,7 +729,7 @@ void main()
 			light_intensity *= pow(spot_cosine,max(u_spot_cone.x,0.0));
 
 			//Phong Equation
-			phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+			phong_light += PhongEquation(color, u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
 		} 
 	}
 	else if(u_light_type == 2) //directional light
@@ -661,7 +744,7 @@ void main()
 		light_vector /= light_distance;
 
 		//Phong Equation
-		phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, false, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		phong_light += PhongEquation(color, u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, false, u_specular_light, normal_vector, omr, v_world_position, u_camera_position, u_cast_shadows, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
 	}	
 
 	//Final color
