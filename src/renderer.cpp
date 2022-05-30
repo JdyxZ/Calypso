@@ -39,7 +39,7 @@ bool sortLight(const LightEntity* l1, const LightEntity* l2)
 
 Renderer::Renderer() {
 	
-	pipeline = FORWARD;
+	pipeline = DEFERRED;
 	gbuffers_fbo = NULL;
 	illumination_fbo = NULL;
 	show_gbuffers = false;
@@ -240,7 +240,7 @@ void GTR::Renderer::renderDeferred(Camera* camera, GTR::Scene* scene) {
 			1, 			//one textures
 			GL_RGB, 	//three channels
 			GL_FLOAT,	//1 byte
-			true);		//add depth_texture
+			false);		//add depth_texture
 	}
 
 	//start rendering inside the gbuffers
