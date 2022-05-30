@@ -599,6 +599,7 @@ void main()
 		vec3 emissive_light = texture2D(u_emissive_texture,v_uv).xyz;
 		color.rgb += emissive_light;
 	}
+	//color.xyz = pow(color.xyz ,vec3(2.2));
 	FragColor = color;
 }
 
@@ -660,7 +661,9 @@ void main()
 	vec4 color = u_color;
 
 	//Load texture values with texture interpolated coordinates
-	color *= texture2D( u_color_texture, v_uv ); 
+	//reading textures while rendering
+	color *= texture(u_color_texture, v_uv);
+	//color.xyz = pow(color.xyz,vec3(2.2));
 	vec3 omr = texture2D(u_omr_texture,v_uv).xyz;
 	vec3 tangent_space_normal = texture2D( u_normal_texture, v_uv ).xyz; 
 
