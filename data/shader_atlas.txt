@@ -100,6 +100,14 @@ float G_Smith( float NdotV, float NdotL, float roughness)
 	return GGX(NdotL, k) * GGX(NdotV, k);
 }
 
+/*float Fd_Burley ( const in float NoV, const in float NoL, const in float LoH, 
+const in float linearRoughness)
+{
+        float f90 = 0.5 + 2.0 * linearRoughness * LoH * LoH;
+        float lightScatter = F_Schlick(NoL, f90);
+        float viewScatter  = F_Schlick(NoV, f90);
+        return lightScatter * viewScatter * RECIPROCAL_PI;
+}*/
 
 vec3 specularBRDF( float roughness, vec3 f0, float NoH, float NoV, float NoL, float LoH )
 {
@@ -120,18 +128,6 @@ vec3 specularBRDF( float roughness, vec3 f0, float NoH, float NoV, float NoL, fl
 
 	return spec;
 }
-
-
-float Fd_Burley ( const in float NoV, const in float NoL, const in float LoH, 
-const in float linearRoughness)
-{
-        float f90 = 0.5 + 2.0 * linearRoughness * LoH * LoH;
-        float lightScatter = F_Schlick(NoL, f90);
-        float viewScatter  = F_Schlick(NoV, f90);
-        return lightScatter * viewScatter * RECIPROCAL_PI;
-}
-
-
 
 vec3 PhongEquation(in vec4 baseColor,in vec3 light_color, in vec3 light_vector, in float light_intensity, in float light_distance, in float light_max_distance, in bool light_attenuation, in bool specular_light, in vec3 normal_vector, in vec3 omr, in vec3 worldpos, in vec3 camera_position, in bool cast_shadows, in float shadow_index, in float num_shadows, in float shadow_bias, in mat4 shadow_vp, in sampler2D shadow_atlas)
 	{
@@ -179,10 +175,10 @@ vec3 PhongEquation(in vec4 baseColor,in vec3 light_color, in vec3 light_vector, 
 		vec3 f0 = mix( vec3(0.5), baseColor.xyz, omr.y);
 
 		//metallic materials do not have diffuse
-		vec3 diffuseColor = (1.0 - omr.y) * baseColor.xyz;
+		//vec3 diffuseColor = (1.0 - omr.y) * baseColor.xyz;
 
 		// linearRoughness = squared roughness
-		vec3 diffuse_factor = diffuseColor * attenuation_factor * NdotL;
+		float diffuse_factor = attenuation_factor * NdotL;
 
 	    float specular_factor = 0.0;
 	    if(specular_light) {
@@ -192,7 +188,7 @@ vec3 PhongEquation(in vec4 baseColor,in vec3 light_color, in vec3 light_vector, 
 	    } 
 
 	    //Phong equation
-		vec3 light = ((diffuse_factor * NdotL) + (specular_factor / NdotL)) * light_color * light_intensity * shadow_factor;
+		vec3 light = ((diffuse_factor) + (specular_factor / NdotL)) * light_color * light_intensity * shadow_factor;
 
 		//Return light
 		return light;
