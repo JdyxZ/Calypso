@@ -51,6 +51,7 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	//FBOs
 	shadow_fbo = NULL;
 	gbuffers_fbo = NULL;
+	illumination_fbo = NULL;
 
 	//Windows size
 	window_size = Vector2(window_width, window_height);
@@ -168,47 +169,7 @@ void Renderer::processNode(const Matrix44& prefab_model, GTR::Node* node, Camera
 		processNode(prefab_model, node->children[i], camera);
 }
 
-//< --------------------------------------------------- Forward pipeline --------------------------------------------------->
-
-//Forward pipeline
-void GTR::Renderer::renderForward()
-{
-	//Set the clear color (the background color)
-	glClearColor(scene->background_color.x, scene->background_color.y, scene->background_color.z, 1.0);
-
-	// Clear the color and the depth buffer
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	checkGLErrors();
-	
-	//Create a new shader
-	Shader* shader = getShader();
-
-	//no shader? then nothing to render
-	if (!shader)
-		return;
-
-	//Enable the shader
-	shader->enable();
-
-	//Set scene uniforms in the shader
-	setSceneUniforms(shader);
-
-	//Send the render calls to the GPU
-	for (int i = 0; i < render_calls.size(); i++)
-	{
-		//Current render call
-		RenderCall* rc = render_calls[i];
-
-		//If bounding box is inside the camera frustum then the prefab is probably visible
-		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
-		{
-			renderDrawCall(shader, rc, camera);
-		}
-	}
-
-	//Disable the shader
-	shader->disable();
-}
+//< --------------------------------------------------- Pipeline globals --------------------------------------------------->
 
 //Shader
 Shader* GTR::Renderer::getShader()
@@ -217,94 +178,19 @@ Shader* GTR::Renderer::getShader()
 	Shader* shader = NULL;
 
 	//Choose a shader to render the scene with
-	switch (scene->render_type) {
-	case(Singlepass):
-		shader = Shader::Get("singlepass");
+	switch (scene->render_pipeline)
+	{
+	case(Forward):
+		shader = Shader::Get("forward");
 		break;
-	case(Multipass):
-		shader = Shader::Get("multipass");
+	case(Deferred):
+		shader = Shader::Get("deferred_illumination");
 		break;
 	}
+
 	assert(glGetError() == GL_NO_ERROR);
 
 	return shader;
-}
-
-//Scene uniforms
-void GTR::Renderer::setSceneUniforms(Shader* shader) 
-{
-	//Upload scene uniforms
-	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
-	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_time", getTime());
-	shader->setUniform("u_occlusion", scene->occlusion);
-	shader->setUniform("u_specular_light", scene->specular_light);
-	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
-	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
-}
-
-//Render a draw call
-void GTR::Renderer::renderDrawCall(Shader* shader, RenderCall* rc, Camera* camera)
-{
-	//In case there is nothing to do
-	if (!rc->mesh || !rc->mesh->getNumVertices() || !rc->material)
-		return;
-	assert(glGetError() == GL_NO_ERROR);
-
-	//Textures
-	Texture* color_texture = NULL;
-	Texture* emissive_texture = NULL;
-	Texture* omr_texture = NULL;
-	Texture* normal_texture = NULL;
-	//Texture* occlusion_texture = NULL;
-
-	//Texture loading
-	color_texture = rc->material->color_texture.texture;
-	if(scene->emissive_materials) emissive_texture = rc->material->emissive_texture.texture;
-	if(scene->specular_light || scene->occlusion) omr_texture = rc->material->metallic_roughness_texture.texture;
-	if(scene->normal_mapping) normal_texture = rc->material->normal_texture.texture;
-	//occlusion_texture = rc->material->occlusion_texture.texture;
-
-	//Texture check
-	if (color_texture == NULL)	color_texture = Texture::getWhiteTexture();
-	if (scene->emissive_materials && emissive_texture == NULL) emissive_texture = Texture::getBlackTexture();
-	if ((scene->specular_light || scene->occlusion) && omr_texture == NULL) omr_texture = Texture::getWhiteTexture();
-
-	//Normal mapping
-	int entity_has_normal_map;
-	if (scene->normal_mapping) entity_has_normal_map = (normal_texture == NULL) ? 0 : 1;
-	else entity_has_normal_map = 0;
-
-	//Select the blending
-	if (rc->material->alpha_mode == GTR::eAlphaMode::BLEND) glEnable(GL_BLEND), glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	else glDisable(GL_BLEND);
-
-	//Select whether to render both sides of the triangles
-	if (rc->material->two_sided) glDisable(GL_CULL_FACE);
-	else glEnable(GL_CULL_FACE);
-	assert(glGetError() == GL_NO_ERROR);
-
-	//Upload textures
-	if(color_texture) shader->setTexture("u_color_texture", color_texture, 0);
-	if (scene->emissive_materials) shader->setTexture("u_emissive_texture", emissive_texture, 1);
-	if (scene->specular_light || scene->occlusion) shader->setTexture("u_omr_texture", omr_texture, 2);
-	if (scene->normal_mapping && normal_texture) shader->setTexture("u_normal_texture", normal_texture, 3);
-	//if(occlusion_texture) shader->setTexture("u_occlussion_texture", occlusion_texture, 4);
-
-	//Upload prefab uniforms
-	shader->setMatrix44("u_model", rc->model);
-	shader->setUniform("u_color", rc->material->color);
-	shader->setUniform("u_alpha_cutoff", rc->material->alpha_mode == GTR::eAlphaMode::MASK ? rc->material->alpha_cutoff : 0); //this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
-	shader->setUniform("u_normal_mapping", entity_has_normal_map);
-
-	switch (scene->render_type) {
-	case(Singlepass):
-		SinglePassLoop(shader, rc->mesh);
-		break;
-	case(Multipass):
-		MultiPassLoop(shader, rc->mesh);
-		break;
-	}
 }
 
 //Singlepass lighting
@@ -383,27 +269,27 @@ void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh)
 			//Specific light properties
 			switch (light->light_type)
 			{
-				case(LightType::POINT):
-					lights_type[j] = light->light_type;
-					break;
-				case (LightType::SPOT):
-					spots_direction[j] = light->model.rotateVector(Vector3(0, 0, -1));
-					spots_cone[j] = Vector2(light->cone_exp, cos(light->cone_angle * DEG2RAD));
-					lights_type[j] = light->light_type;
-					break;
-				case (LightType::DIRECTIONAL):
-					directionals_front[j] = light->model.rotateVector(Vector3(0, 0, -1));
-					lights_type[j] = light->light_type;
-					break;
+			case(LightType::POINT):
+				lights_type[j] = light->light_type;
+				break;
+			case (LightType::SPOT):
+				spots_direction[j] = light->model.rotateVector(Vector3(0, 0, -1));
+				spots_cone[j] = Vector2(light->cone_exp, cos(light->cone_angle * DEG2RAD));
+				lights_type[j] = light->light_type;
+				break;
+			case (LightType::DIRECTIONAL):
+				directionals_front[j] = light->model.rotateVector(Vector3(0, 0, -1));
+				lights_type[j] = light->light_type;
+				break;
 			}
 
 			//Shadow properties
 			if (scene->shadow_atlas && light->cast_shadows)
-			{		
+			{
 				cast_shadows[j] = 1;
-				shadows_index[j] = (float) light->shadow_index;
+				shadows_index[j] = (float)light->shadow_index;
 				shadows_bias[j] = light->shadow_bias;
-				shadows_vp[j] = light->light_camera->viewprojection_matrix;	
+				shadows_vp[j] = light->light_camera->viewprojection_matrix;
 			}
 			else
 			{
@@ -411,7 +297,7 @@ void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh)
 			}
 
 			//Update iterator
-			j++;		
+			j++;
 		}
 
 		//Upload light uniforms
@@ -432,7 +318,7 @@ void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh)
 		shader->setMatrix44Array("u_shadows_vp", &shadows_vp[0], num_lights);
 
 		//Shadow Atlas
-		if (scene->shadow_atlas) 
+		if (scene->shadow_atlas)
 			shader->setUniform("u_shadows", 1);
 		else
 			shader->setUniform("u_shadows", 0);
@@ -504,16 +390,16 @@ void GTR::Renderer::MultiPassLoop(Shader* shader, Mesh* mesh)
 		//Shadow uniforms
 		if (scene->shadow_atlas && light->cast_shadows)
 		{
-			shader->setUniform("u_cast_shadows", 1);
+			shader->setUniform("u_cast_shadow", 1);
 			shader->setUniform("u_shadow_index", (float)light->shadow_index);
 			shader->setUniform("u_shadow_bias", light->shadow_bias);
 			shader->setMatrix44("u_shadow_vp", light->light_camera->viewprojection_matrix);
 		}
 		else
 		{
-			shader->setUniform("u_cast_shadows", 0);
+			shader->setUniform("u_cast_shadow", 0);
 		}
-		
+
 		//do the draw call that renders the mesh into the screen
 		mesh->render(GL_TRIANGLES);
 	}
@@ -523,55 +409,166 @@ void GTR::Renderer::MultiPassLoop(Shader* shader, Mesh* mesh)
 	glDepthFunc(GL_LESS);
 }
 
+//< --------------------------------------------------- Forward pipeline --------------------------------------------------->
+
+//Forward pipeline
+void GTR::Renderer::renderForward()
+{
+	//Set the clear color (the background color)
+	glClearColor(scene->background_color.x, scene->background_color.y, scene->background_color.z, 1.0);
+
+	// Clear the color and the depth buffer
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	checkGLErrors();
+	
+	//Create a new shader
+	Shader* shader = getShader();
+
+	//no shader? then nothing to render
+	if (!shader)
+		return;
+
+	//Enable the shader
+	shader->enable();
+
+	//Upload scene uniforms
+	shader->setUniform("u_render_type", scene->render_type);
+	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	shader->setUniform("u_camera_position", camera->eye);
+	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_occlusion", scene->occlusion);
+	shader->setUniform("u_specular_light", scene->specular_light);
+	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+
+	//Send the render calls to the GPU
+	for (int i = 0; i < render_calls.size(); i++)
+	{
+		//Current render call
+		RenderCall* rc = render_calls[i];
+
+		//If bounding box is inside the camera frustum then the prefab is probably visible
+		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
+		{
+			renderDrawCall(shader, rc, camera);
+		}
+	}
+
+	//Disable the shader
+	shader->disable();
+}
+
+//Render a draw call
+void GTR::Renderer::renderDrawCall(Shader* shader, RenderCall* rc, Camera* camera)
+{
+	//In case there is nothing to do
+	if (!rc->mesh || !rc->mesh->getNumVertices() || !rc->material)
+		return;
+	assert(glGetError() == GL_NO_ERROR);
+
+	//Textures
+	Texture* color_texture = NULL;
+	Texture* emissive_texture = NULL;
+	Texture* omr_texture = NULL;
+	Texture* normal_texture = NULL;
+	//Texture* occlusion_texture = NULL;
+
+	//Texture loading
+	color_texture = rc->material->color_texture.texture;
+	if(scene->emissive_materials) emissive_texture = rc->material->emissive_texture.texture;
+	if(scene->specular_light || scene->occlusion) omr_texture = rc->material->metallic_roughness_texture.texture;
+	if(scene->normal_mapping) normal_texture = rc->material->normal_texture.texture;
+	//occlusion_texture = rc->material->occlusion_texture.texture;
+
+	//Texture check
+	if (color_texture == NULL)	color_texture = Texture::getWhiteTexture();
+	if (scene->emissive_materials && emissive_texture == NULL) emissive_texture = Texture::getBlackTexture();
+	if ((scene->specular_light || scene->occlusion) && omr_texture == NULL) omr_texture = Texture::getWhiteTexture();
+
+	//Normal mapping
+	int entity_has_normal_map;
+	if (scene->normal_mapping) entity_has_normal_map = (normal_texture == NULL) ? 0 : 1;
+	else entity_has_normal_map = 0;
+
+	//Select the blending
+	if (rc->material->alpha_mode == GTR::eAlphaMode::BLEND) glEnable(GL_BLEND), glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	else glDisable(GL_BLEND);
+
+	//Select whether to render both sides of the triangles
+	if (rc->material->two_sided) glDisable(GL_CULL_FACE);
+	else glEnable(GL_CULL_FACE);
+	assert(glGetError() == GL_NO_ERROR);
+
+	//Upload textures
+	if(color_texture) shader->setTexture("u_color_texture", color_texture, 0);
+	if (scene->emissive_materials) shader->setTexture("u_emissive_texture", emissive_texture, 1);
+	if (scene->specular_light || scene->occlusion) shader->setTexture("u_omr_texture", omr_texture, 2);
+	if (scene->normal_mapping && normal_texture) shader->setTexture("u_normal_texture", normal_texture, 3);
+	//if(occlusion_texture) shader->setTexture("u_occlussion_texture", occlusion_texture, 4);
+
+	//Upload prefab uniforms
+	shader->setMatrix44("u_model", rc->model);
+	shader->setUniform("u_color", rc->material->color);
+	shader->setUniform("u_alpha_cutoff", rc->material->alpha_mode == GTR::eAlphaMode::MASK ? rc->material->alpha_cutoff : 0); //this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
+	shader->setUniform("u_normal_mapping", entity_has_normal_map);
+	shader->setUniform("u_emissive_factor", rc->material->emissive_factor);
+
+	//Select render tpye
+	switch (scene->render_type) {
+	case(Singlepass):
+		SinglePassLoop(shader, rc->mesh);
+		break;
+	case(Multipass):
+		MultiPassLoop(shader, rc->mesh);
+		break;
+	}
+}
+
 // <--------------------------------------------------- Deferred pipeline --------------------------------------------------->
 
 //Deferred pipeline
 void GTR::Renderer::renderDeferred()
 {
+	/*
+		GBUFFERS
+	*/
 
 	//Set the clear color  (clear the color and the depth buffer)
 	glClearColor(scene->background_color.x, scene->background_color.y, scene->background_color.z, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	checkGLErrors();
 
-	//Crear gbuffers si no existen
+	//Crete the gbuffers fbo if they don't exist yet
 	if (!gbuffers_fbo)
 	{
 		//Create a new FBO
 		gbuffers_fbo = new FBO();
 
-		//Create 4 textures of 4 components
+		//Create three textures of four components
 		gbuffers_fbo->create(window_size.x, window_size.y,
-			4, 					//four textures
+			3, 					//three textures
 			GL_RGBA, 			//four channels
 			GL_UNSIGNED_BYTE,	//1 byte
 			true);				//add depth_texture
-
-
 	}
 
-	//Create the gbuffers shader
+	//Get the gbuffers shader
 	Shader* shader = Shader::Get("gbuffers");
 
 	//no shader? then nothing to render
 	if (!shader)
 		return;
 
-	//Start rendering inside the gbuffers
+	//Start rendering inside the gbuffers fbo
 	gbuffers_fbo->bind();
 
-	//Set the clear color  (clear the color and the depth buffer)
-	glClearColor(scene->background_color.x, scene->background_color.y, scene->background_color.z, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	checkGLErrors();
-
-	//Enable all buffers back
-	gbuffers_fbo->enableAllBuffers();
+	//Clear all buffers
+	clearGBuffers();
 
 	//Enable the shader
 	shader->enable();
 
-	//Set scene uniforms in the shader
+	//Upload Scene Uniforms
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
 	shader->setUniform("u_time", getTime());
@@ -595,15 +592,66 @@ void GTR::Renderer::renderDeferred()
 	//Disable the shader
 	shader->disable();
 
-	//Stop rendering to the gbuffers
+	//Stop rendering to the gbuffers fbo
 	gbuffers_fbo->unbind();
 
-	//Show GBuffers
-	if (scene->show_gbuffers)
-		showGBuffers();
+	/*
+	
+		ILLUMINATION
+	
+	*/
 
-	//aplicar multipass o singlepass y renderizar a pantalla
+	//Crete the illumination fbo if they don't exist yet
+	if (!illumination_fbo)
+	{
+		//Create a new FBO
+		illumination_fbo = new FBO();
 
+		//Create one texture with RGB components
+		illumination_fbo->create(window_size.x, window_size.y,
+			2, 					//two texture
+			GL_RGB, 			//three channels
+			GL_UNSIGNED_BYTE,	//1 byte
+			true);				//add depth_texture
+	}
+
+	//Get the illumination shader
+	shader = getShader();
+
+	//no shader? then nothing to render
+	if (!shader)
+		return;
+
+	//Start rendering inside the illumination fbo
+	illumination_fbo->bind();
+
+	//Clear all buffers
+	clearIlluminationBuffers();
+
+	//Enable the shader
+	shader->enable();
+
+	//Render lights into the ilumination fbo
+	renderDeferredIllumination(shader, camera);
+
+	//Disable the shader
+	shader->disable();
+
+	//Stop rendering to the illumination fbo
+	illumination_fbo->unbind();
+
+	//Show Buffers or render the final frame
+	if (scene->show_buffers)
+		showBuffers();
+	else
+	{
+		//Reset viewport
+		glViewport(0, 0, window_size.x, window_size.y);
+
+		//Final frame
+		illumination_fbo->color_textures[0]->toViewport();
+	}
+	
 }
 
 void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera)
@@ -647,13 +695,13 @@ void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camer
 	if (scene->emissive_materials) shader->setTexture("u_emissive_texture", emissive_texture, 1);
 	if (scene->specular_light || scene->occlusion) shader->setTexture("u_omr_texture", omr_texture, 2);
 	if (scene->normal_mapping && normal_texture) shader->setTexture("u_normal_texture", normal_texture, 3);
-	//if(occlusion_texture) shader->setTexture("u_occlussion_texture", occlusion_texture, 4);
 
 	//Upload prefab uniforms
 	shader->setMatrix44("u_model", rc->model);
 	shader->setUniform("u_color", rc->material->color);
 	shader->setUniform("u_alpha_cutoff", rc->material->alpha_mode == GTR::eAlphaMode::MASK ? rc->material->alpha_cutoff : 0); //this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha).
 	shader->setUniform("u_normal_mapping", entity_has_normal_map);
+	shader->setUniform("u_emissive_factor", rc->material->emissive_factor);
 
 	//Do the draw call that renders the mesh into the screen
 	rc->mesh->render(GL_TRIANGLES);
@@ -664,11 +712,92 @@ void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camer
 
 }
 
-void GTR::Renderer::showGBuffers()
+void GTR::Renderer::renderDeferredIllumination(Shader* shader, Camera* camera)
 {
-	if (scene->show_gbuffers && gbuffers_fbo && gbuffers_fbo->num_color_textures > 0)
+	//Fullscreen quad
+	Mesh* quad = Mesh::getQuad();
+
+	//Set scene uniforms in the shader
+	Matrix44 camera_vp = camera->viewprojection_matrix;
+	shader->setUniform("u_render_type", scene->render_type);
+	shader->setUniform("u_viewprojection", camera_vp);
+	shader->setUniform("u_inverse_viewprojection", camera_vp.inverse()); //Pass the inverse projection of the camera to reconstruct world pos.
+	shader->setUniform("u_iRes", Vector2(1.0 / (float)window_size.x, 1.0 / (float)window_size.y)); //Pass the inverse window resolution, this may be useful
+	shader->setUniform("u_camera_position", camera->eye);
+	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_occlusion", scene->occlusion);
+	shader->setUniform("u_specular_light", scene->specular_light);
+	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+
+	//Upload textures
+	shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
+	shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
+	shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
+	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+
+	//Disable depth test as we are not going to test geometry
+	glDisable(GL_DEPTH_TEST);
+	
+	//Select render tpye
+	switch (scene->render_type) {
+	case(Singlepass):
+		SinglePassLoop(shader, quad);
+		break;
+	case(Multipass):
+		//MultiPassLoop(shader, quad);
+		break;
+	}
+}
+
+//We clear in several passes so we can control the clear color independently for every gbuffer
+void GTR::Renderer::clearGBuffers()
+{
+	//Disable all but the GB0 (and the depth)
+	gbuffers_fbo->enableSingleBuffer(0);
+
+	//Clear GB0 with the color (and depth)
+	glClearColor(0.1, 0.1, 0.1, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//Now enable the second GB to clear it
+	gbuffers_fbo->enableSingleBuffer(1);
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	//Now enable the third GB to clear it
+	gbuffers_fbo->enableSingleBuffer(2);
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	//Enable all buffers back
+	gbuffers_fbo->enableAllBuffers();
+}
+
+//We clear in several passes so we can control the clear color independently for every illumination buffer
+void GTR::Renderer::clearIlluminationBuffers()
+{
+	//Disable all but the GB0 (and the depth)
+	illumination_fbo->enableSingleBuffer(0);
+
+	//Clear GB0 with the color (and depth)
+	glClearColor(0.1, 0.1, 0.1, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//Now enable the second GB to clear it
+	illumination_fbo->enableSingleBuffer(1);
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	//Enable all buffers back
+	illumination_fbo->enableAllBuffers();
+}
+
+void GTR::Renderer::showBuffers()
+{
+	if (scene->show_buffers && gbuffers_fbo && gbuffers_fbo->num_color_textures > 0)
 	{
-		if (!scene->toggle_gbuffers)
+		if (!scene->toggle_buffers)
 		{
 			//Regions
 			Vector4 albedo_region = Vector4(0, window_size.y * 0.5, window_size.x * 0.5, window_size.y * 0.5);
@@ -690,18 +819,19 @@ void GTR::Renderer::showGBuffers()
 
 			//Result screen
 			glViewport(result_region.x, result_region.y, result_region.z, result_region.w);
+			illumination_fbo->color_textures[0]->toViewport();
 		}
 		else
 		{
 			//Regions
-			Vector4 position_region = Vector4(0, window_size.y * 0.5, window_size.x * 0.5, window_size.y * 0.5);
+			Vector4 illumination_region = Vector4(0, window_size.y * 0.5, window_size.x * 0.5, window_size.y * 0.5);
 			Vector4 depth_region = Vector4(window_size.x * 0.5, window_size.y * 0.5, window_size.x * 0.5, window_size.y * 0.5);
 			Vector4 emissive_region = Vector4(0, 0, window_size.x * 0.5, window_size.y * 0.5);
 			Vector4 result_region = Vector4(window_size.x * 0.5, 0, window_size.x * 0.5, window_size.y * 0.5);
 
-			//Position region
-			glViewport(position_region.x, position_region.y, position_region.z, position_region.w);
-			gbuffers_fbo->color_textures[3]->toViewport();
+			//Illumination region
+			glViewport(illumination_region.x, illumination_region.y, illumination_region.z, illumination_region.w);
+			illumination_fbo->color_textures[1]->toViewport();
 
 			//Depth region
 			Shader* shader = Shader::Get("linearize");
@@ -714,13 +844,13 @@ void GTR::Renderer::showGBuffers()
 				shader->disable();
 			}
 
-	
 			//Emissive region
 			glViewport(emissive_region.x, emissive_region.y, emissive_region.z, emissive_region.w);
 			viewportEmissive();		
 
 			//Result screen
 			glViewport(result_region.x, result_region.y, result_region.z, result_region.w);
+			illumination_fbo->color_textures[0]->toViewport();
 		}
 
 	}

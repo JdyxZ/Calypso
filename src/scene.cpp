@@ -31,8 +31,8 @@ GTR::Scene::Scene()
 	num_shadows = 0;
 
 	//GBuffers debugging
-	show_gbuffers = false;
-	toggle_gbuffers = false;
+	show_buffers = false;
+	toggle_buffers = false;
 
 	//Shadow atlas debugging
 	atlas_resolution_index = 2; //Set by default 2048 x 2048 resolution

@@ -290,7 +290,7 @@ void Application::renderDebugGUI(void)
 	ImGui::Checkbox("Shadow sorting", &scene->shadow_sorting);
 
 	if(scene->render_pipeline == GTR::RenderPipeline::Deferred)
-		ImGui::Checkbox("GBuffers", &scene->show_gbuffers);
+		ImGui::Checkbox("GBuffers", &scene->show_buffers);
 
 	//Shadow resolution
 	scene->shadow_resolution_trigger = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, shadow_resolutions, IM_ARRAYSIZE(shadow_resolutions));
@@ -300,8 +300,8 @@ void Application::renderDebugGUI(void)
 
 	//Render type
 	switch (scene->render_type) {
-		case(GTR::Singlepass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Singlepass, GTR::Multipass, "SinglePass"); break;
-		case(GTR::Multipass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Singlepass, GTR::Multipass, "Multipass"); break;
+		case(GTR::Singlepass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Multipass, GTR::Singlepass, "SinglePass"); break;
+		case(GTR::Multipass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Multipass, GTR::Singlepass, "Multipass"); break;
 	}
 
 	//Scene Color
@@ -419,7 +419,7 @@ void Application::onKeyDown( SDL_KeyboardEvent event )
 			scene->atlas_scope++;
 			break;
 		case SDLK_TAB:
-			scene->toggle_gbuffers = !scene->toggle_gbuffers;
+			scene->toggle_buffers = !scene->toggle_buffers;
 			break;
 		case SDLK_a:
 			io->AddInputCharacter('a');

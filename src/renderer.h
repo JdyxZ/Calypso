@@ -36,6 +36,7 @@ namespace GTR {
 		//FBOs
 		FBO* shadow_fbo;
 		FBO* gbuffers_fbo;
+		FBO* illumination_fbo;
 
 		//Render variables
 		std::vector<LightEntity*> lights; //Here we store each Light to be sent to the Shadder.
@@ -55,18 +56,22 @@ namespace GTR {
 		void processPrefab(const Matrix44& model, GTR::Prefab* prefab, Camera* camera);  //Processes a whole prefab (with all its nodes)
 		void processNode(const Matrix44& model, GTR::Node* node, Camera* camera); //Processes one node from the prefab and its children
 
-		//Forward pipeline
-		void renderForward();
+		//Pipeline globals
 		Shader* getShader(); //Get the shader to render the scene with
-		void setSceneUniforms(Shader* shader); //Set scene Uniforms
-		void renderDrawCall(Shader* shader, RenderCall* rc, Camera* camera); //Render a draw call	
 		void SinglePassLoop(Shader* shader, Mesh* mesh); //Singlepass lighting
 		void MultiPassLoop(Shader* shader, Mesh* mesh); //Multipass lighting
+
+		//Forward pipeline
+		void renderForward();
+		void renderDrawCall(Shader* shader, RenderCall* rc, Camera* camera); //Render a draw call	
 
 		//Deferred pipeline
 		void renderDeferred();
 		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera);
-		void showGBuffers();
+		void renderDeferredIllumination(Shader* shader, Camera* camera);
+		void clearGBuffers();
+		void clearIlluminationBuffers();
+		void showBuffers();
 		void viewportEmissive();
 
 		//Shadow Atlas

@@ -35,8 +35,8 @@ namespace GTR {
 	};
 
 	enum RenderType {
-		Singlepass = 0,
-		Multipass = 1,
+		Multipass = 0,
+		Singlepass = 1,
 	};
 
 	class Scene;
@@ -125,9 +125,9 @@ namespace GTR {
 		bool shadow_sorting; //Whether we sort light by shadows or not.
 		int num_shadows; //The number of shadows in the scene.
 
-		//GBuffers
-		bool show_gbuffers;
-		bool toggle_gbuffers;
+		//Deferred buffers
+		bool show_buffers;
+		bool toggle_buffers;
 
 		//Shadow atlas
 		int atlas_resolution_index; //The corresponding index in the array of shadow atlas resolutions
