@@ -433,6 +433,7 @@ void GTR::Renderer::renderForward()
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
 	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_ambient_light", scene->ambient_light);
 	shader->setUniform("u_occlusion", scene->occlusion);
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
@@ -605,49 +606,10 @@ void GTR::Renderer::renderDeferred()
 	gbuffers_fbo->unbind();
 
 	/*
-	
-		ILLUMINATION & BLENDING
-	
-	*/
-
-	//Crete the illumination fbo if they don't exist yet
-	if (!illumination_fbo)
-	{
-		//Create a new FBO
-		illumination_fbo = new FBO();
-
-		//Create one texture with RGB components
-		illumination_fbo->create(window_size.x, window_size.y,
-			2, 					//two texture
-			GL_RGB, 			//three channels
-			GL_UNSIGNED_BYTE,	//1 byte
-			true);				//add depth_texture
-	}
-
-	//Start rendering inside the illumination fbo
-	illumination_fbo->bind();
-
-	//Copy teh gbuffers depth texture to illumination fbo
-	gbuffers_fbo->depth_texture->copyTo(NULL);
-
-	//Clear all buffers
-	clearIlluminationBuffers();
-
-	//Render lights into the ilumination fbo
-	renderDeferredIllumination();
-
-	//Render objects with blending in forward pipeline
-	renderTransparentObjects(transparent_objects);
-
-	//Stop rendering to the illumination fbo
-	illumination_fbo->unbind();
-
-	/*
 
 		   SSAO
 
    */
-
    //Crete the ssao fbo if they don't exist yet
 	if (!ssao_fbo)
 	{
@@ -670,7 +632,7 @@ void GTR::Renderer::renderDeferred()
 	glDisable(GL_BLEND);
 
 	//Get the ssao shader
-	
+
 	shader = Shader::Get("ssao");
 	shader->enable();
 
@@ -686,6 +648,46 @@ void GTR::Renderer::renderDeferred()
 
 	//Stop rendering to the ssao fbo
 	ssao_fbo->unbind();
+
+	/*
+	
+		ILLUMINATION & BLENDING
+	
+	*/
+
+	//Crete the illumination fbo if they don't exist yet
+	if (!illumination_fbo)
+	{
+		//Create a new FBO
+		illumination_fbo = new FBO();
+
+		//Create one texture with RGB components
+		illumination_fbo->create(window_size.x, window_size.y,
+			2, 					//two texture
+			GL_RGB, 			//three channels
+			GL_UNSIGNED_BYTE,	//1 byte
+			true);				//add depth_texture
+	}
+
+	
+
+	//Start rendering inside the illumination fbo
+	illumination_fbo->bind();
+
+	//Copy teh gbuffers depth texture to illumination fbo
+	gbuffers_fbo->depth_texture->copyTo(NULL);
+
+	//Clear all buffers
+	clearIlluminationBuffers();
+
+	//Render lights into the ilumination fbo
+	renderDeferredIllumination();
+
+	//Render objects with blending in forward pipeline
+	renderTransparentObjects(transparent_objects);
+
+	//Stop rendering to the illumination fbo
+	illumination_fbo->unbind();
 
 	//Show Buffers or render the final frame
 	if (scene->show_buffers)
@@ -776,15 +778,15 @@ void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camer
 void GTR::Renderer::renderDeferredIllumination()
 {
 	//Get shaders
-	Shader* sphere_shader = Shader::Get("deferred_illumination_sphere");
+	//Shader* sphere_shader = Shader::Get("deferred_illumination_sphere");
 	Shader* quad_shader = Shader::Get("deferred_illumination_quad");
 
 	//no shader? then nothing to render
-	if (!sphere_shader || !quad_shader)
+	if (/*!sphere_shader ||*/ !quad_shader)
 		return;
 
 	//Get meshes
-	Mesh* sphere = Mesh::Get("data/meshes/sphere.obj", false);
+	//Mesh* sphere = Mesh::Get("data/meshes/sphere.obj", false);
 	Mesh* quad = Mesh::getQuad();	
 
 	//Select render tpye
@@ -850,7 +852,7 @@ void GTR::Renderer::renderDeferredIllumination()
 		//Disable blending for the first iteration
 		glDisable(GL_BLEND);
 	
-		//Enable the shader
+		/*//Enable the shader
 		sphere_shader->enable();
 
 		//Set scene uniforms
@@ -861,7 +863,7 @@ void GTR::Renderer::renderDeferredIllumination()
 
 		//Disable the shader
 		sphere_shader->disable();
-
+		*/
 		//Enable blending
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE);
@@ -941,6 +943,7 @@ void GTR::Renderer::setIlluminationSceneUniforms(Shader* shader)
 	shader->setUniform("u_iRes", Vector2(1.0 / (float)window_size.x, 1.0 / (float)window_size.y)); //Pass the inverse window resolution, this may be useful
 	shader->setUniform("u_camera_position", camera->eye);
 	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_ambient_light", scene->ambient_light);
 	shader->setUniform("u_occlusion", scene->occlusion);
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
@@ -951,6 +954,7 @@ void GTR::Renderer::setIlluminationSceneUniforms(Shader* shader)
 	shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
 	shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
 	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+	shader->setTexture("u_ssao_texture", ssao_fbo->color_textures[0], 4);
 }
 
 //We clear in several passes so we can control the clear color independently for every gbuffer

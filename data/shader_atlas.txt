@@ -183,14 +183,14 @@ uniform float u_shadow_bias;
 uniform mat4 u_shadow_vp;
 
 
-vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
+vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in float ao_factor)
 {
 	//Compute ambient factor
 	float ambient_factor = 1.0;
 	if(u_occlusion) ambient_factor = omr.x;
 
 	//Set ambient light to phong light
-	vec3 phong_light = ambient_factor * u_ambient_light;
+	vec3 phong_light = ambient_factor * u_ambient_light * ao_factor;
 
 	//Single pass for loop
 	for( int i = 0; i < MAX_LIGHTS; ++i )
@@ -263,14 +263,14 @@ vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
 	return phong_light;
 }
 
-vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
+vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in float ao_factor)
 {
 	//Compute ambient factor
 	float ambient_factor = 1.0;
 	if(u_occlusion) ambient_factor = omr.x;
 
 	//Set ambient light to phong light
-	vec3 phong_light = ambient_factor * u_ambient_light;
+	vec3 phong_light = ambient_factor * u_ambient_light * ao_factor;
 
 	//Light intesity
 	float light_intensity = u_light_intensity;
@@ -415,7 +415,7 @@ void main()
 	vec3 tangent_space_normal = texture2D( u_normal_texture, v_uv ).xyz;
 	color *= texture2D( u_color_texture, v_uv );	
 	vec3 omr = texture2D(u_omr_texture,v_uv).xyz;
-
+	float ao_factor = 1.0;
 	//Mask
 	if(color.a < u_alpha_cutoff)
 		discard;
@@ -430,8 +430,8 @@ void main()
 
 	//Compute phong
 	vec3 light;
-	if(u_render_type == 0) light = Multipass(normal_vector, omr, v_world_position);
-	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, v_world_position);
+	if(u_render_type == 0) light = Multipass(normal_vector, omr, v_world_position, ao_factor);
+	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, v_world_position, ao_factor);
 	
 	//Final color
 	color.rgb *= light;
@@ -470,6 +470,7 @@ uniform sampler2D u_gb1_texture;
 uniform sampler2D u_gb2_texture;
 uniform sampler2D u_depth_texture;
 uniform sampler2D u_shadow_atlas;
+uniform sampler2D u_ssao_texture;
 
 //Scene uniforms
 uniform int u_render_type;
@@ -499,6 +500,8 @@ void main()
 	vec4 gb1 = texture2D( u_gb1_texture, uv );
 	vec4 gb2 = texture2D( u_gb2_texture, uv );
 	float depth = texture2D( u_depth_texture, uv ).x;
+	float ao_factor = texture2D( u_ssao_texture, uv ).x;
+	ao_factor = smoothstep(0.5, 0.7, ao_factor);
 
 	//Assign each buffer value to its material property
 	vec3 color = gb0.xyz;
@@ -516,8 +519,8 @@ void main()
 
 	//Compute phong
 	vec3 light;
-	if(u_render_type == 0) light = Multipass(normal_vector, omr, world_position);
-	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, world_position);
+	if(u_render_type == 0) light = Multipass(normal_vector, omr, world_position, ao_factor);
+	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, world_position, ao_factor);
 
 	//Final color
 	color *= light;
