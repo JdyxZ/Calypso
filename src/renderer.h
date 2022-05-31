@@ -85,6 +85,7 @@ namespace GTR {
 
 	};
 
+	//Cubemap
 	Texture* CubemapFromHDRE(const char* filename);
 
 };

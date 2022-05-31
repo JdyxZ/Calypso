@@ -413,7 +413,7 @@ void main()
 	color *= texture2D( u_color_texture, v_uv );	
 	vec3 omr = texture2D(u_omr_texture,v_uv).xyz;
 
-	//ZBuffer-Test
+	//Mask
 	if(color.a < u_alpha_cutoff)
 		discard;
 

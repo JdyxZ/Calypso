@@ -220,8 +220,8 @@ void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh, std::vector<Light
 		if (starting_light == 5)
 		{
 			glEnable(GL_BLEND);
-			if (scene->render_pipeline == Forward) glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-			else if (scene->render_pipeline == Deferred) glBlendFunc(GL_ONE, GL_ONE);
+			if (scene->render_pipeline = Forward) glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+			else if (scene->render_pipeline = Deferred) glBlendFunc(GL_ONE, GL_ONE);
 			shader->setUniform("u_ambient_light", Vector3());
 		}
 		if (final_light == lights_size - 1) shader->setUniform("u_last_iteration", 1);
@@ -327,8 +327,8 @@ void GTR::Renderer::MultiPassLoop(Shader* shader, Mesh* mesh, std::vector<LightE
 		if (i == 1)
 		{
 			glEnable(GL_BLEND);
-			if(scene->render_pipeline == Forward) glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-			else if(scene->render_pipeline == Deferred) glBlendFunc(GL_ONE, GL_ONE);
+			if(scene->render_pipeline = Forward) glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+			else if(scene->render_pipeline = Deferred) glBlendFunc(GL_ONE, GL_ONE);
 			shader->setUniform("u_ambient_light", Vector3());//reset the ambient light
 		}
 		if (i == lights_vector.size() - 1) shader->setUniform("u_last_iteration", 1);
@@ -490,10 +490,9 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	}
-
 	else glDisable(GL_BLEND);
 
-	//Blending support
+	//Enable blending support
 	glDepthFunc(GL_LEQUAL);
 
 	//Select whether to render both sides of the triangles
@@ -583,8 +582,10 @@ void GTR::Renderer::renderDeferred()
 		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
 		{
 			if (rc->material->alpha_mode == BLEND)
+			{
 				transparent_objects.push_back(rc);
 				continue;
+			}
 			
 			renderGBuffers(shader, rc, camera);
 		}
@@ -598,7 +599,7 @@ void GTR::Renderer::renderDeferred()
 
 	/*
 	
-		ILLUMINATION
+		ILLUMINATION & BLENDING
 	
 	*/
 
@@ -613,11 +614,14 @@ void GTR::Renderer::renderDeferred()
 			2, 					//two texture
 			GL_RGB, 			//three channels
 			GL_UNSIGNED_BYTE,	//1 byte
-			false);				//add depth_texture
+			true);				//add depth_texture
 	}
 
 	//Start rendering inside the illumination fbo
 	illumination_fbo->bind();
+
+	//Copy teh gbuffers depth texture to illumination fbo
+	gbuffers_fbo->depth_texture->copyTo(NULL);
 
 	//Clear all buffers
 	clearIlluminationBuffers();
@@ -772,7 +776,7 @@ void GTR::Renderer::renderDeferredIllumination()
 		}
 
 		//Enable depth test
-		//glEnable(GL_DEPTH_TEST);
+		glEnable(GL_DEPTH_TEST);
 
 		//Draw the inner part of the sphere
 		//glDepthFunc(GL_GREATER);
@@ -839,6 +843,9 @@ void GTR::Renderer::renderTransparentObjects(std::vector<RenderCall*>& transpare
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+
+	//Enable depth test for blending
+	glEnable(GL_DEPTH_TEST);
 
 	//Render transparent objects with the forward pipeline
 	for (auto it = transparent_objects.begin(); it != transparent_objects.end(); ++it)
@@ -1343,6 +1350,8 @@ void GTR::Renderer::showShadowAtlas()
 	glViewport(0, 0, window_size.x, window_size.y);
 
 }
+
+// <--------------------------------------------------- Cubemap --------------------------------------------------->
 
 //Cubemap texture
 Texture* GTR::CubemapFromHDRE(const char* filename)
