@@ -353,17 +353,17 @@ uniform float u_time;
 
 void main()
 {		
-	//calcule the normal in camera space (the NormalMatrix is like ViewMatrix but without traslation)
+	//Calculate the normal in camera space (the NormalMatrix is like ViewMatrix but without traslation)
 	v_normal = (u_model * vec4( a_normal, 0.0) ).xyz;
 
-	//calculate the vertex in object space
+	//Calculate the vertex in object space
 	vec3 position = a_vertex;
 	v_world_position = (u_model * vec4( position, 1.0) ).xyz;
 
-	//store the texture coordinates
+	//Store the texture coordinates
 	v_uv = a_coord;
 
-	//calcule the position of the vertex using the matrices
+	//Calculate the position of the vertex using the matrices
 	gl_Position = u_viewprojection * vec4( v_world_position, 1.0 );
 }
 
@@ -477,8 +477,8 @@ uniform float u_time;
 uniform bool u_last_iteration;
 
 //Output
-layout(location = 0) out vec4 I0;
-layout(location = 1) out vec4 I1;
+layout(location = 0) out vec3 I0;
+layout(location = 1) out vec3 I1;
 
 //Includes
 #include normal_mapping
@@ -521,8 +521,8 @@ void main()
 	if(u_emissive_materials) color += emissive_light;
 
 	//Fill buffers
-	I0 = vec4(color,1.0);
-	I1 = vec4(light,1.0);
+	I0 = color;
+	I1 = light;
 	
 
 }

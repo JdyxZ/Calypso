@@ -62,17 +62,18 @@ namespace GTR {
 
 		//Forward pipeline
 		void renderForward();
-		void renderDrawCall(Shader* shader, RenderCall* rc, Camera* camera); //Render a draw call	
+		void renderMesh(Shader* shader, RenderCall* rc, Camera* camera); 
 
 		//Deferred pipeline
 		void renderDeferred();
-		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera);
-		void renderDeferredIllumination();
-		void setIlluminationSceneUniforms(Shader* shader);
-		void clearGBuffers();
-		void clearIlluminationBuffers();
-		void showBuffers();
-		void viewportEmissive();
+		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera); 
+		void renderDeferredIllumination(); 
+		void renderTransparentObjects(std::vector<RenderCall*>& transparent_objects); 
+		void setIlluminationSceneUniforms(Shader* shader); 
+		void clearGBuffers(); 
+		void clearIlluminationBuffers(); 
+		void showBuffers(); 
+		void viewportEmissive(); 
 
 		//Shadow Atlas
 		void updateShadowAtlas();

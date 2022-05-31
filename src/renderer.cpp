@@ -220,7 +220,8 @@ void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh, std::vector<Light
 		if (starting_light == 5)
 		{
 			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+			if (scene->render_pipeline == Forward) glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+			else if (scene->render_pipeline == Deferred) glBlendFunc(GL_ONE, GL_ONE);
 			shader->setUniform("u_ambient_light", Vector3());
 		}
 		if (final_light == lights_size - 1) shader->setUniform("u_last_iteration", 1);
@@ -326,7 +327,8 @@ void GTR::Renderer::MultiPassLoop(Shader* shader, Mesh* mesh, std::vector<LightE
 		if (i == 1)
 		{
 			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+			if(scene->render_pipeline == Forward) glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+			else if(scene->render_pipeline == Deferred) glBlendFunc(GL_ONE, GL_ONE);
 			shader->setUniform("u_ambient_light", Vector3());//reset the ambient light
 		}
 		if (i == lights_vector.size() - 1) shader->setUniform("u_last_iteration", 1);
@@ -442,7 +444,7 @@ void GTR::Renderer::renderForward()
 		//If bounding box is inside the camera frustum then the prefab is probably visible
 		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
 		{
-			renderDrawCall(shader, rc, camera);
+			renderMesh(shader, rc, camera);
 		}
 	}
 
@@ -450,8 +452,8 @@ void GTR::Renderer::renderForward()
 	shader->disable();
 }
 
-//Render a draw call
-void GTR::Renderer::renderDrawCall(Shader* shader, RenderCall* rc, Camera* camera)
+//Render a mesh with its materials and lights
+void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 {
 	//In case there is nothing to do
 	if (!rc->mesh || !rc->mesh->getNumVertices() || !rc->material)
@@ -483,7 +485,12 @@ void GTR::Renderer::renderDrawCall(Shader* shader, RenderCall* rc, Camera* camer
 	else entity_has_normal_map = 0;
 
 	//Select the blending
-	if (rc->material->alpha_mode == GTR::eAlphaMode::BLEND) glEnable(GL_BLEND), glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	if (rc->material->alpha_mode == GTR::eAlphaMode::BLEND)
+	{
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
+
 	else glDisable(GL_BLEND);
 
 	//Blending support
@@ -563,6 +570,9 @@ void GTR::Renderer::renderDeferred()
 	shader->setUniform("u_camera_position", camera->eye);
 	shader->setUniform("u_time", getTime());
 
+	//Create a vector for transparent objects, to render them at the end of the pipeline
+	vector<RenderCall*> transparent_objects;
+
 	//Send render calls to the GPU
 	for (int i = 0; i < render_calls.size(); i++)
 	{
@@ -573,6 +583,7 @@ void GTR::Renderer::renderDeferred()
 		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
 		{
 			if (rc->material->alpha_mode == BLEND)
+				transparent_objects.push_back(rc);
 				continue;
 			
 			renderGBuffers(shader, rc, camera);
@@ -600,7 +611,7 @@ void GTR::Renderer::renderDeferred()
 		//Create one texture with RGB components
 		illumination_fbo->create(window_size.x, window_size.y,
 			2, 					//two texture
-			GL_RGBA, 			//three channels
+			GL_RGB, 			//three channels
 			GL_UNSIGNED_BYTE,	//1 byte
 			false);				//add depth_texture
 	}
@@ -613,6 +624,9 @@ void GTR::Renderer::renderDeferred()
 
 	//Render lights into the ilumination fbo
 	renderDeferredIllumination();
+
+	//Render objects with blending in forward pipeline
+	renderTransparentObjects(transparent_objects);
 
 	//Stop rendering to the illumination fbo
 	illumination_fbo->unbind();
@@ -631,6 +645,7 @@ void GTR::Renderer::renderDeferred()
 	
 }
 
+//Fill the GBuffers
 void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera)
 {
 	//In case there is nothing to do
@@ -690,6 +705,7 @@ void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camer
 
 }
 
+//Render the deferred illumination
 void GTR::Renderer::renderDeferredIllumination()
 {
 	//Get shaders
@@ -756,13 +772,13 @@ void GTR::Renderer::renderDeferredIllumination()
 		}
 
 		//Enable depth test
-		glEnable(GL_DEPTH_TEST);
+		//glEnable(GL_DEPTH_TEST);
 
 		//Draw the inner part of the sphere
-		glDepthFunc(GL_GREATER);
+		//glDepthFunc(GL_GREATER);
 
 		//Block writing to the ZBuffer so we do not modify it with our geometry
-		glDepthMask(false);
+		//glDepthMask(false);
 
 		//Disable blending for the first iteration
 		glDisable(GL_BLEND);
@@ -801,6 +817,48 @@ void GTR::Renderer::renderDeferredIllumination()
 	}
 }
 
+//Render objects with transparencies
+void GTR::Renderer::renderTransparentObjects(std::vector<RenderCall*>& transparent_objects)
+{
+	//Get forward shader
+	Shader* shader = Shader::Get("forward");
+
+	//no shader? then nothing to render
+	if (!shader)
+		return;
+
+	//Enable shader
+	shader->enable();
+
+	//Upload scene uniforms
+	shader->setUniform("u_render_type", scene->render_type);
+	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	shader->setUniform("u_camera_position", camera->eye);
+	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_occlusion", scene->occlusion);
+	shader->setUniform("u_specular_light", scene->specular_light);
+	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+
+	//Render transparent objects with the forward pipeline
+	for (auto it = transparent_objects.begin(); it != transparent_objects.end(); ++it)
+	{
+		//Current render call
+		RenderCall* rc = *it;
+
+		//If bounding box is inside the camera frustum then the prefab is probably visible
+		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
+		{
+			renderMesh(shader, rc, camera);
+		}
+	}
+
+	//Disable shader
+	shader->disable();
+
+}
+
+//Deferred illumination shader uniforms
 void GTR::Renderer::setIlluminationSceneUniforms(Shader* shader)
 {
 	//Set scene uniforms in the shader
@@ -868,6 +926,7 @@ void GTR::Renderer::clearIlluminationBuffers()
 	illumination_fbo->enableAllBuffers();
 }
 
+//Show the gbuffers and the illumination buffers
 void GTR::Renderer::showBuffers()
 {
 	if (scene->show_buffers && gbuffers_fbo && gbuffers_fbo->num_color_textures > 0)
@@ -931,6 +990,7 @@ void GTR::Renderer::showBuffers()
 	}
 }
 
+//Viewport emissive texture from color, normal and omr textures
 void GTR::Renderer::viewportEmissive()
 {
 	//Get the shader
