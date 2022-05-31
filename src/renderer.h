@@ -57,9 +57,8 @@ namespace GTR {
 		void processNode(const Matrix44& model, GTR::Node* node, Camera* camera); //Processes one node from the prefab and its children
 
 		//Pipeline globals
-		Shader* getShader(); //Get the shader to render the scene with
-		void SinglePassLoop(Shader* shader, Mesh* mesh); //Singlepass lighting
-		void MultiPassLoop(Shader* shader, Mesh* mesh); //Multipass lighting
+		void SinglePassLoop(Shader* shader, Mesh* mesh, std::vector<LightEntity*>& lights_vector);//Singlepass lighting
+		void MultiPassLoop(Shader* shader, Mesh* mesh, std::vector<LightEntity*>& lights_vector); //Multipass lighting
 
 		//Forward pipeline
 		void renderForward();
@@ -68,7 +67,8 @@ namespace GTR {
 		//Deferred pipeline
 		void renderDeferred();
 		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera);
-		void renderDeferredIllumination(Shader* shader, Camera* camera);
+		void renderDeferredIllumination();
+		void setIlluminationSceneUniforms(Shader* shader);
 		void clearGBuffers();
 		void clearIlluminationBuffers();
 		void showBuffers();

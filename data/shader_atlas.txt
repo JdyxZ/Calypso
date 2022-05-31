@@ -4,7 +4,8 @@ forward pixel.vs forward.fs
 //Deferred pipeline shaders
 gbuffers pixel.vs gbuffers.fs
 emissive quad.vs emissive.fs
-deferred_illumination quad.vs deferred.fs
+deferred_illumination_sphere pixel.vs deferred.fs
+deferred_illumination_quad quad.vs deferred.fs
 
 //Depth map shaders
 depth depth.vs color.fs
@@ -439,6 +440,93 @@ void main()
 	FragColor = color;
 }
 
+\quad.vs
+
+#version 330 core
+
+in vec3 a_vertex;
+in vec2 a_coord;
+out vec2 v_uv;
+
+void main()
+{	
+	v_uv = a_coord;
+	gl_Position = vec4( a_vertex, 1.0 );
+}
+
+\deferred.fs
+
+#version 330 core
+
+//Interpolated variables
+in vec2 v_uv;
+
+//Textures
+uniform sampler2D u_gb0_texture;
+uniform sampler2D u_gb1_texture;
+uniform sampler2D u_gb2_texture;
+uniform sampler2D u_depth_texture;
+uniform sampler2D u_shadow_atlas;
+
+//Scene uniforms
+uniform int u_render_type;
+uniform bool u_emissive_materials;
+uniform mat4 u_inverse_viewprojection;
+uniform vec2 u_iRes;
+uniform float u_time;
+uniform bool u_last_iteration;
+
+//Output
+layout(location = 0) out vec4 I0;
+layout(location = 1) out vec4 I1;
+
+//Includes
+#include normal_mapping
+#include shadow_test
+#include phong
+#include lighting
+
+void main()
+{
+	//Extract uvs from pixel screenpos
+	vec2 uv = v_uv; 
+
+	//Load texture values with screen interpolated coordinates
+	vec4 gb0 = texture2D( u_gb0_texture, uv );
+	vec4 gb1 = texture2D( u_gb1_texture, uv );
+	vec4 gb2 = texture2D( u_gb2_texture, uv );
+	float depth = texture2D( u_depth_texture, uv ).x;
+
+	//Assign each buffer value to its material property
+	vec3 color = gb0.xyz;
+	vec3 normal_vector = (gb1.xyz * 2.0 - vec3(1.0)); //normals must be converted from 0..1 to -1..+1
+	vec3 omr = gb2.xyz;
+	vec3 emissive_light = vec3(gb0.a,gb1.a,gb2.a);
+
+	//Renormalize normal in case of data loss
+	normal_vector = normalize(normal_vector);
+	
+	//Compute world position
+	vec4 screen_pos = vec4(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 world_position = proj_worldpos.xyz / proj_worldpos.w;
+
+	//Compute phong
+	vec3 light;
+	if(u_render_type == 0) light = Multipass(normal_vector, omr, world_position);
+	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, world_position);
+
+	//Final color
+	color *= light;
+	if(u_emissive_materials) color += emissive_light;
+
+	//Fill buffers
+	I0 = vec4(color,1.0);
+	I1 = vec4(light,1.0);
+	
+
+}
+
 \gbuffers.fs
 
 #version 330 core
@@ -529,92 +617,6 @@ void main()
 	emissive_factor.b = texture2D(u_omr_texture,v_uv).a;
 
 	FragColor = vec4(emissive_factor,1.0);
-}
-
-\deferred.fs
-
-#version 330 core
-
-//Interpolated variables
-in vec2 v_uv;
-
-//Textures
-uniform sampler2D u_gb0_texture;
-uniform sampler2D u_gb1_texture;
-uniform sampler2D u_gb2_texture;
-uniform sampler2D u_depth_texture;
-uniform sampler2D u_shadow_atlas;
-
-//Scene uniforms
-uniform int u_render_type;
-uniform mat4 u_inverse_viewprojection;
-uniform vec2 u_iRes;
-uniform float u_time;
-uniform bool u_last_iteration;
-
-//Output
-layout(location = 0) out vec3 GB0;
-layout(location = 1) out vec3 GB1;
-
-//Includes
-#include normal_mapping
-#include shadow_test
-#include phong
-#include lighting
-
-void main()
-{
-	//Extract uvs from pixel screenpos
-	vec2 uv = v_uv * u_iRes.xy; 
-
-	//Load texture values with screen interpolated coordinates
-	vec4 gb0 = texture2D( u_gb0_texture, uv );
-	vec4 gb1 = texture2D( u_gb1_texture, uv );
-	vec4 gb2 = texture2D( u_gb2_texture, uv );
-	float depth = texture2D( u_depth_texture, uv ).x;
-
-	//Assign each buffer value to its material property
-	vec3 color = gb0.xyz;
-	vec3 normal_vector = (gb1.xyz * 2.0 - vec3(1.0)); //normals must be converted from 0..1 to -1..+1
-	vec3 omr = gb2.xyz;
-
-	//Renormalize normal in case of data loss
-	normal_vector = normalize(normal_vector);
-	
-	//Compute world position
-	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
-	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
-	vec3 world_position = proj_worldpos.xyz / proj_worldpos.w;
-
-	//Compute phong
-	vec3 light = Singlepass(normal_vector, omr, world_position);
-
-	//Final color
-	color *= light;
-	if(u_last_iteration)
-	{
-		vec3 emissive_light = vec3(gb0.a,gb1.a,gb2.a);
-		color += emissive_light;
-	}
-
-	//Fill buffers
-	GB0 = color;
-	GB1 = light;
-
-}
-
-\quad.vs
-
-#version 330 core
-
-in vec3 a_vertex;
-in vec2 a_coord;
-out vec2 v_uv;
-
-void main()
-{	
-	v_uv = a_coord;
-	gl_Position = vec4( a_vertex, 1.0 );
 }
 
 \linearize.fs
