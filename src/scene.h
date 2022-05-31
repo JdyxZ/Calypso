@@ -44,6 +44,11 @@ namespace GTR {
 		SSAOp = 1,
 	};
 
+	enum LightEquation {
+		PBR = 0,
+		Phong = 1,
+	};
+
 	class Scene;
 	class Prefab;
 
@@ -127,6 +132,7 @@ namespace GTR {
 		bool normal_mapping; //Whether we are redering with normal map or interpolated normals.
 		int render_pipeline; //Whether we are rendering with forward or deferred pipeline. By deafult we set the flag to Deferred.
 		int render_type; //Whether we are rendering with Single Pass or Multi Pass. By deafult we set the flag to Single Pass.
+		int light_equation;
 		bool shadow_sorting; //Whether we sort light by shadows or not.
 		int num_shadows; //The number of shadows in the scene.
 

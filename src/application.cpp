@@ -314,6 +314,11 @@ void Application::renderDebugGUI(void)
 		case(GTR::Singlepass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Multipass, GTR::Singlepass, "SinglePass"); break;
 		case(GTR::Multipass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Multipass, GTR::Singlepass, "Multipass"); break;
 	}
+	//LightEquation
+	switch (scene->light_equation) {
+		case(GTR::PBR): ImGui::SliderInt("Light equation", &scene->light_equation,  GTR::PBR, GTR::Phong, "PBR"); break;
+		case(GTR::Phong): ImGui::SliderInt("Light equation", &scene->light_equation,  GTR::PBR, GTR::Phong, "Phong"); break;
+	}
 
 	//Scene Color
 	ImGui::ColorEdit3("Background color", scene->background_color.v);

@@ -448,6 +448,7 @@ void GTR::Renderer::renderForward()
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	shader->setUniform("u_light_equation", scene->light_equation);
 
 	//Send the render calls to the GPU
 	for (int i = 0; i < render_calls.size(); i++)
@@ -625,8 +626,13 @@ void GTR::Renderer::renderDeferred()
 
 		 */
 		//Crete the ssao fbo if they don't exist yet
-		if (!ssao_fbo)
+		if (!ssao_fbo || scene->resolution_trigger)
 		{
+			if (ssao_fbo)
+			{
+				delete ssao_fbo;
+				ssao_fbo = NULL;
+			}
 			//Create a new FBO
 			ssao_fbo = new FBO();
 
@@ -659,8 +665,13 @@ void GTR::Renderer::renderDeferred()
 
 		*/
 		//Crete the ssao fbo if they don't exist yet
-		if (!ssao_p_fbo)
+		if (!ssao_p_fbo || scene->resolution_trigger)
 		{
+			if (ssao_p_fbo)
+			{
+				delete ssao_p_fbo;
+				ssao_p_fbo = NULL;
+			}
 			//Create a new FBO
 			ssao_p_fbo = new FBO();
 
@@ -810,8 +821,6 @@ void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camer
 	glDisable(GL_BLEND);
 	glDisable(GL_CULL_FACE);
 	glDepthFunc(GL_LESS);
-
-
 }
 
 void GTR::Renderer::getssaoBlur() {
@@ -833,17 +842,17 @@ void GTR::Renderer::renderSSAO(std::vector<Vector3> rand_points) {
 	Matrix44 inv_vp = camera->viewprojection_matrix;
 	inv_vp.inverse();
 
-	int rsize= rand_points.size();
-	/*Vector3 rpoints[rsize];
+
+	Vector3 rpoints[64];
 	for (int i = 0; i < rand_points.size(); i++)
 	{
-		rpoints = rand_points[i];
-	}*/
+		rpoints[i] = rand_points[i];
+	}
 
 	Shader* shader;
 
 	if (scene->SSAO_type == SSAOType::SSAOp) {
-		getssaoBlur();
+		//getssaoBlur();
 		shader = Shader::Get("ssaop");
 
 	}
@@ -858,7 +867,7 @@ void GTR::Renderer::renderSSAO(std::vector<Vector3> rand_points) {
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_inverse_viewprojection", inv_vp);
 	shader->setUniform("u_iRes", Vector2(1.0 / (float)window_size.x, 1.0 / (float)window_size.y));
-	shader->setUniform3Array("u_points", (float*)&rand_points[0], rand_points.size());
+	shader->setUniform3Array("u_points", (float*)&rpoints[0], rand_points.size());
 
 	quad->render(GL_TRIANGLES);
 }
@@ -921,6 +930,7 @@ void GTR::Renderer::renderQuadIllumination()
 	quad_shader->setUniform("u_specular_light", scene->specular_light);
 	quad_shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	quad_shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	quad_shader->setUniform("u_light_equation", scene->light_equation);
 
 	//Upload textures
 	quad_shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
@@ -1013,6 +1023,7 @@ void GTR::Renderer::renderSphereIllumination()
 	sphere_shader->setUniform("u_specular_light", scene->specular_light);
 	sphere_shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	sphere_shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	sphere_shader->setUniform("u_light_equation", scene->light_equation);
 
 	//Don't add the emissive lights and the ambient light now
 	sphere_shader->setUniform("u_ambient_light", Vector3());
@@ -1076,6 +1087,7 @@ void GTR::Renderer::renderSphereIllumination()
 	quad_shader->setUniform("u_specular_light", scene->specular_light);
 	quad_shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	quad_shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	quad_shader->setUniform("u_light_equation", scene->light_equation);
 
 	//Upload textures
 	quad_shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);

@@ -10,7 +10,7 @@ deferred_illumination_quad quad.vs deferred.fs
 //SSAO shader
 ssao quad.vs ssao.fs
 ssaop quad.vs ssaop.fs
-ssao_blur quad.vs ssao_blur.fs
+//ssao_blur quad.vs ssao_blur.fs
 
 //Depth map shaders
 depth depth.vs color.fs
@@ -86,7 +86,10 @@ float testShadowMap(in float shadow_index, in float num_shadows,in float shadows
 	return shadow_factor;
 }
 
-\PBR
+\pbr
+#define RECIPROCAL_PI 0.3183098861837697
+#define PI 3.14159265359
+
 float D_GGX (	const in float NoH, const in float linearRoughness )
 {
 	float a2 = linearRoughness * linearRoughness;
@@ -250,6 +253,7 @@ uniform bool u_occlusion;
 uniform bool u_shadows;
 uniform int u_num_lights;
 uniform float u_num_shadows;
+uniform int u_light_equation;
 
 //Single pass maximum number of lights to render
 const int MAX_LIGHTS = 5;
@@ -295,7 +299,7 @@ uniform float u_shadow_bias;
 uniform mat4 u_shadow_vp;
 
 
-vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in float ao_factor)
+vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in float ao_factor, in vec4 baseColor)
 {
 	//Compute ambient factor
 	float ambient_factor = 1.0;
@@ -323,8 +327,14 @@ vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in f
 				//Normalize light vector
 				light_vector /= light_distance;
 
-				//Phong Equation
-				phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+				if(u_light_equation == 1){
+					//Phong Equation
+					phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+				}else if(u_light_equation == 0){
+					//PBR Equation
+					phong_light += PBR(baseColor,u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+				}
+				
 
 			}
 			else if(u_lights_type[i] == 1)//spot light
@@ -350,8 +360,14 @@ vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in f
 					//Light intesity
 					light_intensity *= pow(spot_cosine,max(u_spots_cone[i].x,0.0));
 
-					//Phong Equation
-					phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+					if(u_light_equation == 1){
+						//Phong Equation
+						phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+					}else if(u_light_equation == 0){
+						//PBR Equation
+						phong_light += PBR(baseColor,u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+					}
+				
 				}
 
 			}
@@ -366,8 +382,14 @@ vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in f
 				//Normalize light vector
 				light_vector /= light_distance;
 
-				//Phong Equation
-				phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], false, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);			
+				if(u_light_equation == 1){
+					//Phong Equation
+					phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], false, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+				}else if(u_light_equation == 0){
+					//PBR Equation
+					phong_light += PBR(baseColor,u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], false, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+				}
+							
 			}			
 		}
 	}
@@ -375,7 +397,7 @@ vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in f
 	return phong_light;
 }
 
-vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in float ao_factor)
+vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in float ao_factor, in vec4 baseColor)
 {
 	//Compute ambient factor
 	float ambient_factor = 1.0;
@@ -398,8 +420,14 @@ vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in fl
 		//Normalize light vector
 		light_vector /= light_distance;
 
-		//Phong Equation
-		phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		if(u_light_equation == 1){
+			//Phong Equation
+			phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		}
+		else if(u_light_equation == 0){
+			//Phong Equation
+			phong_light += PBR(baseColor, u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		}
 
 	}
 	else if(u_light_type == 1)//spot light
@@ -425,8 +453,14 @@ vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in fl
 			//Light intesity
 			light_intensity *= pow(spot_cosine,max(u_spot_cone.x,0.0));
 
-			//Phong Equation
-			phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+			if(u_light_equation == 1){
+				//Phong Equation
+				phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+			}
+			else if(u_light_equation == 0){
+				//Phong Equation
+				phong_light += PBR(baseColor, u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+			}
 		} 
 	}
 	else if(u_light_type == 2) //directional light
@@ -440,8 +474,14 @@ vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position, in fl
 		//Normalize light vector
 		light_vector /= light_distance;
 
-		//Phong Equation
-		phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, false, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		if(u_light_equation == 1){
+			//Phong Equation
+			phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, false, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		}
+		else if(u_light_equation == 0){
+			//Phong Equation
+			phong_light += PBR(baseColor, u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, false, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		}
 	}	
 
 	return phong_light;
@@ -516,6 +556,7 @@ out vec4 FragColor;
 #include normal_mapping
 #include shadow_test
 #include phong
+#include pbr
 #include lighting
 
 void main()
@@ -542,8 +583,8 @@ void main()
 
 	//Compute phong
 	vec3 light;
-	if(u_render_type == 0) light = Multipass(normal_vector, omr, v_world_position, ao_factor);
-	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, v_world_position, ao_factor);
+	if(u_render_type == 0) light = Multipass(normal_vector, omr, v_world_position, ao_factor, color);
+	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, v_world_position, ao_factor, color);
 	
 	//Final color
 	color.rgb *= light;
@@ -600,7 +641,9 @@ layout(location = 1) out vec3 I1;
 #include normal_mapping
 #include shadow_test
 #include phong
+#include pbr
 #include lighting
+
 
 void main()
 {
@@ -634,8 +677,8 @@ void main()
 
 	//Compute phong
 	vec3 light;
-	if(u_render_type == 0) light = Multipass(normal_vector, omr, world_position, ao_factor);
-	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, world_position, ao_factor);
+	if(u_render_type == 0) light = Multipass(normal_vector, omr, world_position, ao_factor, vec4(color, 1.0));
+	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, world_position, ao_factor, vec4(color, 1.0));
 
 	//Final color
 	color *= light;
@@ -790,7 +833,7 @@ void main()
 	FragColor = vec4(ao);
 }
 
-\ssao_blur.fs
+/*\ssao_blur.fs
 
 #version 330 core
 
@@ -815,7 +858,7 @@ void main() {
     }
 
     FragColor = vec4(result / (4.0 * 4.0));
-} 
+} */
 
 \ssaop.fs
 
