@@ -38,12 +38,15 @@ namespace GTR {
 		FBO* gbuffers_fbo;
 		FBO* illumination_fbo;
 		FBO* ssao_fbo;
+		FBO* ssao_p_fbo;
 
 		//Render variables
 		std::vector<LightEntity*> lights; //Here we store each Light to be sent to the Shadder.
 		std::vector<RenderCall*> render_calls; // Here we store each RenderCall to be sent to the Shadder.
 
-		std::vector<Vector3> rand_points;
+		//SSAO
+		std::vector<Vector3> rand_points_ssao;
+		std::vector<Vector3> rand_points_ssao_p;		
 
 		//Shadow Resolution
 		int shadow_map_resolution = 2048; //Default Resolution
@@ -69,10 +72,14 @@ namespace GTR {
 
 		//Deferred pipeline
 		void renderDeferred();
-		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera); 
-		void renderDeferredIllumination(); 
-		void renderTransparentObjects(std::vector<RenderCall*>& transparent_objects); 
-		void setIlluminationSceneUniforms(Shader* shader); 
+		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera);
+		void getssaoBlur();
+		void renderSSAO(std::vector<Vector3> rand_points);
+		void renderDeferredIllumination();
+		void renderQuadIllumination();
+		void renderSphereIllumination();
+
+		void renderTransparentObjects(std::vector<RenderCall*>& transparent_objects);
 		void clearGBuffers(); 
 		void clearIlluminationBuffers(); 
 		void showBuffers(); 

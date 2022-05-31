@@ -36,6 +36,8 @@ GTR::Scene::Scene()
 
 	//SSAO debugging
 	show_ssao = false;
+	show_ssaop = false;
+	SSAO_type = SSAO;
 
 	//Shadow atlas debugging
 	atlas_resolution_index = 2; //Set by default 2048 x 2048 resolution
@@ -43,6 +45,7 @@ GTR::Scene::Scene()
 	atlas_scope = 0;
 
 	//Scene triggers: We set them true just for the first iteration
+	resolution_trigger = true;
 	entity_trigger = true;
 	prefab_trigger = true;
 	light_trigger = true;
@@ -270,6 +273,7 @@ bool GTR::Scene::save()
 
 void GTR::Scene::resetTriggers()
 {
+	this->resolution_trigger = false;
 	this->entity_trigger = false;
 	this->prefab_trigger = false;
 	this->light_trigger = false;

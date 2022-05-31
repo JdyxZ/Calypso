@@ -39,6 +39,11 @@ namespace GTR {
 		Singlepass = 1,
 	};
 
+	enum SSAOType {
+		SSAO = 0,
+		SSAOp = 1,
+	};
+
 	class Scene;
 	class Prefab;
 
@@ -131,6 +136,8 @@ namespace GTR {
 
 		//SSAO
 		bool show_ssao;
+		bool show_ssaop;
+		SSAOType SSAO_type;
 
 		//Shadow atlas
 		int atlas_resolution_index; //The corresponding index in the array of shadow atlas resolutions
@@ -138,6 +145,7 @@ namespace GTR {
 		bool show_atlas; //Enables or disables the display of the shadow atlas.
 
 		//Scene triggers
+		bool resolution_trigger; //Triggers if a resolution 
 		bool entity_trigger; //Triggers if an entity has changed its visibility or a visible entity has changed its model.
 		bool prefab_trigger; //Triggers if a new prefab has been added to the scene or an old one has been deleted.
 		bool light_trigger; //Triggers if a new light has been added to the scene or an old one has been deleted.

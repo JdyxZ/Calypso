@@ -292,13 +292,23 @@ void Application::renderDebugGUI(void)
 	if(scene->render_pipeline == GTR::RenderPipeline::Deferred)
 		ImGui::Checkbox("GBuffers", &scene->show_buffers);
 
-	ImGui::Checkbox("Show SSAO", &scene->show_ssao);
+	switch (scene->SSAO_type) {
+	case (0):
+		ImGui::Checkbox("SSAO", &scene->show_ssao);
+		break;
+	case(1):
+		ImGui::Checkbox("SSAO+", &scene->show_ssaop);
+		break;
+	}
+	
+	ImGui::Combo("Swap SSAO", (int*)&scene->SSAO_type, "SSAO\0SSAOp", 2);
+
 	//Shadow resolution
 	scene->shadow_resolution_trigger = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, shadow_resolutions, IM_ARRAYSIZE(shadow_resolutions));
 
 	//Render pipeline
 	ImGui::Combo("Render Pipelne", (int*)&scene->render_pipeline, "Forward\0Deferred", 2);
-
+	
 	//Render type
 	switch (scene->render_type) {
 		case(GTR::Singlepass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Multipass, GTR::Singlepass, "SinglePass"); break;
@@ -606,6 +616,7 @@ void Application::onResize(int width, int height)
 	camera->aspect =  width / (float)height;
 	window_width = width;
 	window_height = height;
+	scene->resolution_trigger = true;
 	renderer->window_size = Vector2(width, height);
 }
 

@@ -53,8 +53,10 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	gbuffers_fbo = NULL;
 	illumination_fbo = NULL;
 	ssao_fbo = NULL;
+	ssao_p_fbo = NULL;
 
-	rand_points = generateSpherePoints(64, 1, false);
+	rand_points_ssao = generateSpherePoints(64, 1, false);
+	rand_points_ssao_p = generateSpherePoints(64, 1, true);
 
 	//Windows size
 	window_size = Vector2(window_width, window_height);
@@ -63,7 +65,7 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 //< --------------------------------------------------- Scene render --------------------------------------------------->
 
 void Renderer::renderScene()
-{	
+{
 	//Set the render calls and lights of the renderer
 	processScene();
 
@@ -125,12 +127,12 @@ void Renderer::processScene()
 			lights.push_back(light);
 		}
 	}
-	
+
 
 	//Now we sort the RenderCalls vector according to the boolean method sortRenderCall
 	if (scene->alpha_sorting)
 		std::sort(render_calls.begin(), render_calls.end(), sortRenderCall);
-	
+
 }
 
 //Renders all the prefab
@@ -223,8 +225,11 @@ void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh, std::vector<Light
 		if (starting_light == 5)
 		{
 			glEnable(GL_BLEND);
-			if (scene->render_pipeline = Forward) glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-			else if (scene->render_pipeline = Deferred) glBlendFunc(GL_ONE, GL_ONE);
+			if (scene->render_pipeline == Forward)
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+			else if (scene->render_pipeline == Deferred)
+				glBlendFunc(GL_ONE, GL_ONE);
+
 			shader->setUniform("u_ambient_light", Vector3());
 		}
 		if (final_light == lights_size - 1) shader->setUniform("u_last_iteration", 1);
@@ -314,6 +319,8 @@ void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh, std::vector<Light
 	//set the render state as it was before to avoid problems with future renders
 	glDisable(GL_BLEND);
 	glDepthFunc(GL_LESS);
+	glFrontFace(GL_CCW);
+	glDepthMask(true);
 }
 
 //Multipass lighting
@@ -330,8 +337,11 @@ void GTR::Renderer::MultiPassLoop(Shader* shader, Mesh* mesh, std::vector<LightE
 		if (i == 1)
 		{
 			glEnable(GL_BLEND);
-			if(scene->render_pipeline = Forward) glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-			else if(scene->render_pipeline = Deferred) glBlendFunc(GL_ONE, GL_ONE);
+			if (scene->render_pipeline == Forward)
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+			else if (scene->render_pipeline == Deferred)
+				glBlendFunc(GL_ONE, GL_ONE);
+
 			shader->setUniform("u_ambient_light", Vector3());//reset the ambient light
 		}
 		if (i == lights_vector.size() - 1) shader->setUniform("u_last_iteration", 1);
@@ -417,7 +427,7 @@ void GTR::Renderer::renderForward()
 	// Clear the color and the depth buffer
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	checkGLErrors();
-	
+
 	//Create a new shader
 	Shader* shader = Shader::Get("forward");
 
@@ -430,10 +440,10 @@ void GTR::Renderer::renderForward()
 
 	//Upload scene uniforms
 	shader->setUniform("u_render_type", scene->render_type);
+	shader->setUniform("u_ambient_light", scene->ambient_light);
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
 	shader->setUniform("u_time", getTime());
-	shader->setUniform("u_ambient_light", scene->ambient_light);
 	shader->setUniform("u_occlusion", scene->occlusion);
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
@@ -473,9 +483,9 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 
 	//Texture loading
 	color_texture = rc->material->color_texture.texture;
-	if(scene->emissive_materials) emissive_texture = rc->material->emissive_texture.texture;
-	if(scene->specular_light || scene->occlusion) omr_texture = rc->material->metallic_roughness_texture.texture;
-	if(scene->normal_mapping) normal_texture = rc->material->normal_texture.texture;
+	if (scene->emissive_materials) emissive_texture = rc->material->emissive_texture.texture;
+	if (scene->specular_light || scene->occlusion) omr_texture = rc->material->metallic_roughness_texture.texture;
+	if (scene->normal_mapping) normal_texture = rc->material->normal_texture.texture;
 	//occlusion_texture = rc->material->occlusion_texture.texture;
 
 	//Texture check
@@ -505,7 +515,7 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 	assert(glGetError() == GL_NO_ERROR);
 
 	//Upload textures
-	if(color_texture) shader->setTexture("u_color_texture", color_texture, 0);
+	if (color_texture) shader->setTexture("u_color_texture", color_texture, 0);
 	if (scene->emissive_materials) shader->setTexture("u_emissive_texture", emissive_texture, 1);
 	if (scene->specular_light || scene->occlusion) shader->setTexture("u_omr_texture", omr_texture, 2);
 	if (scene->normal_mapping && normal_texture) shader->setTexture("u_normal_texture", normal_texture, 3);
@@ -534,17 +544,19 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 //Deferred pipeline
 void GTR::Renderer::renderDeferred()
 {
-	Mesh* quad = Mesh::getQuad();
-	Matrix44 inv_vp = camera->viewprojection_matrix;
-	inv_vp.inverse();
-
 	/*
 		GBUFFERS
 	*/
 
 	//Crete the gbuffers fbo if they don't exist yet
-	if (!gbuffers_fbo)
+	if (!gbuffers_fbo || scene->resolution_trigger)
 	{
+		if (gbuffers_fbo)
+		{
+			delete gbuffers_fbo;
+			gbuffers_fbo = NULL;
+		}
+
 		//Create a new FBO
 		gbuffers_fbo = new FBO();
 
@@ -554,6 +566,7 @@ void GTR::Renderer::renderDeferred()
 			GL_RGBA, 			//four channels
 			GL_UNSIGNED_BYTE,	//1 byte
 			true);				//add depth_texture
+
 	}
 
 	//Get the gbuffers shader
@@ -594,7 +607,7 @@ void GTR::Renderer::renderDeferred()
 				transparent_objects.push_back(rc);
 				continue;
 			}
-			
+
 			renderGBuffers(shader, rc, camera);
 		}
 	}
@@ -605,59 +618,90 @@ void GTR::Renderer::renderDeferred()
 	//Stop rendering to the gbuffers fbo
 	gbuffers_fbo->unbind();
 
-	/*
+	if (scene->SSAO_type == SSAOType::SSAO) {
+		/*
 
 		   SSAO
 
-   */
-   //Crete the ssao fbo if they don't exist yet
-	if (!ssao_fbo)
-	{
-		//Create a new FBO
-		ssao_fbo = new FBO();
+		 */
+		//Crete the ssao fbo if they don't exist yet
+		if (!ssao_fbo)
+		{
+			//Create a new FBO
+			ssao_fbo = new FBO();
 
-		//Create three textures of four components
-		ssao_fbo->create(window_size.x, window_size.y,
-			3,                     //three textures
-			GL_RGBA,             //four channels
-			GL_UNSIGNED_BYTE,    //1 byte
-			false);                //add depth_texture
+			//Create three textures of four components
+			ssao_fbo->create(window_size.x, window_size.y,
+				3,                     //three textures
+				GL_RGBA,             //four channels
+				GL_UNSIGNED_BYTE,    //1 byte
+				false);                //add depth_texture
 
+		}
+
+		//Start rendering inside the ssao fbo
+		ssao_fbo->bind();
+
+		//Clear all buffers
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
+
+		renderSSAO(rand_points_ssao);
+
+
+		//Stop rendering to the ssao fbo
+		ssao_fbo->unbind();
+	}
+	else {
+		/*
+
+		   SSAO+
+
+		*/
+		//Crete the ssao fbo if they don't exist yet
+		if (!ssao_p_fbo)
+		{
+			//Create a new FBO
+			ssao_p_fbo = new FBO();
+
+			//Create three textures of four components
+			ssao_p_fbo->create(window_size.x, window_size.y,
+				3,                     //three textures
+				GL_RGBA,             //four channels
+				GL_UNSIGNED_BYTE,    //1 byte
+				false);                //add depth_texture
+
+		}
+
+		//Start rendering inside the ssao fbo
+		ssao_p_fbo->bind();
+
+		//Clear all buffers
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
+
+		renderSSAO(rand_points_ssao_p);
+
+
+		//Stop rendering to the ssao fbo
+		ssao_p_fbo->unbind();
 	}
 
-	//Start rendering inside the ssao fbo
-	ssao_fbo->bind();
-
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_BLEND);
-
-	//Get the ssao shader
-
-	shader = Shader::Get("ssao");
-	shader->enable();
-
-
-	shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 0);
-	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 1);
-	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
-	shader->setUniform("u_inverse_viewprojection", inv_vp);
-	shader->setUniform("u_iRes", Vector2(1.0 / (float)window_size.x, 1.0 / (float)window_size.y));
-	shader->setUniform3Array("u_points", (float*)&rand_points[0], rand_points.size());
-
-	quad->render(GL_TRIANGLES);
-
-	//Stop rendering to the ssao fbo
-	ssao_fbo->unbind();
-
 	/*
-	
+
 		ILLUMINATION & BLENDING
-	
+
 	*/
 
 	//Crete the illumination fbo if they don't exist yet
-	if (!illumination_fbo)
+	if (!illumination_fbo || scene->resolution_trigger)
 	{
+		if (illumination_fbo)
+		{
+			delete illumination_fbo;
+			illumination_fbo = NULL;
+		}
+
 		//Create a new FBO
 		illumination_fbo = new FBO();
 
@@ -669,16 +713,14 @@ void GTR::Renderer::renderDeferred()
 			true);				//add depth_texture
 	}
 
-	
-
 	//Start rendering inside the illumination fbo
 	illumination_fbo->bind();
 
-	//Copy teh gbuffers depth texture to illumination fbo
-	gbuffers_fbo->depth_texture->copyTo(NULL);
-
 	//Clear all buffers
 	clearIlluminationBuffers();
+
+	//Copy the gbuffers depth texture to enable depth testing in illumination fbo
+	gbuffers_fbo->depth_texture->copyTo(NULL);
 
 	//Render lights into the ilumination fbo
 	renderDeferredIllumination();
@@ -692,17 +734,14 @@ void GTR::Renderer::renderDeferred()
 	//Show Buffers or render the final frame
 	if (scene->show_buffers)
 		showBuffers();
-	else
-	{
-		//Reset viewport
+	else if (scene->show_ssao) {
 		glViewport(0, 0, window_size.x, window_size.y);
-
-		//Final frame
-		illumination_fbo->color_textures[0]->toViewport();
-	}
-
-	if (scene->show_ssao)
 		ssao_fbo->color_textures[0]->toViewport();
+	}
+	else if (scene->show_ssaop) {
+		glViewport(0, 0, window_size.x, window_size.y);
+		ssao_p_fbo->color_textures[0]->toViewport();
+	}
 	else
 	{
 		//Reset viewport
@@ -772,123 +811,297 @@ void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camer
 	glDisable(GL_CULL_FACE);
 	glDepthFunc(GL_LESS);
 
+
 }
+
+void GTR::Renderer::getssaoBlur() {
+	//Get the shader
+	Shader* shader = Shader::Get("ssao_blur");
+	//maybe we want to create also one for the blur, in this case just create a texture
+	Texture* ssao_blur = new Texture();
+	ssao_blur->create(window_size.x, window_size.y);
+	shader->enable();
+	shader->setUniform("u_iRes", Vector2(1.0 / (float)window_size.x, 1.0 / (float)window_size.y));
+	shader->setTexture("u_ssao_texture", ssao_p_fbo->color_textures[0], 0);
+	ssao_blur->toViewport(shader);
+	shader->disable();
+}
+
+void GTR::Renderer::renderSSAO(std::vector<Vector3> rand_points) {
+
+	Mesh* quad = Mesh::getQuad();
+	Matrix44 inv_vp = camera->viewprojection_matrix;
+	inv_vp.inverse();
+
+	int rsize= rand_points.size();
+	/*Vector3 rpoints[rsize];
+	for (int i = 0; i < rand_points.size(); i++)
+	{
+		rpoints = rand_points[i];
+	}*/
+
+	Shader* shader;
+
+	if (scene->SSAO_type == SSAOType::SSAOp) {
+		getssaoBlur();
+		shader = Shader::Get("ssaop");
+
+	}
+	else {
+		shader = Shader::Get("ssao");
+	}
+
+	shader->enable();
+
+	shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 0);
+	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 1);
+	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	shader->setUniform("u_inverse_viewprojection", inv_vp);
+	shader->setUniform("u_iRes", Vector2(1.0 / (float)window_size.x, 1.0 / (float)window_size.y));
+	shader->setUniform3Array("u_points", (float*)&rand_points[0], rand_points.size());
+
+	quad->render(GL_TRIANGLES);
+}
+
 
 //Render the deferred illumination
 void GTR::Renderer::renderDeferredIllumination()
 {
+	switch (scene->render_type)
+	{
+	case(Singlepass):
+		renderQuadIllumination();
+		break;
+	case(Multipass):
+		renderSphereIllumination();
+		break;
+	}
+}
+
+
+void GTR::Renderer::renderQuadIllumination()
+{
 	//Get shaders
-	//Shader* sphere_shader = Shader::Get("deferred_illumination_sphere");
 	Shader* quad_shader = Shader::Get("deferred_illumination_quad");
 
 	//no shader? then nothing to render
-	if (/*!sphere_shader ||*/ !quad_shader)
+	if (!quad_shader)
+		return;
+
+	//Get mesh
+	Mesh* quad = Mesh::getQuad();
+
+	//Disable blending for the first iteration
+	glDisable(GL_BLEND);
+
+	//Block writing to the ZBuffer so we do not modify it with our geometry
+	glDepthMask(false);
+
+	//Disable depth test as we are not going to test geometry
+	glDisable(GL_DEPTH_TEST);
+
+	//Enable the shader
+	quad_shader->enable();
+
+	//Scene support variables
+	Vector2 i_Res = Vector2(1.0 / window_size.x, 1.0 / window_size.y);
+	Matrix44 inv_camera_vp = camera->viewprojection_matrix;
+	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
+
+	//Set scene uniforms in the shader
+	quad_shader->setUniform("u_render_type", scene->render_type);
+	quad_shader->setUniform("u_ambient_light", scene->ambient_light);
+	quad_shader->setUniform("u_emissive_materials", scene->emissive_materials);
+	quad_shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
+	quad_shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
+	quad_shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
+	quad_shader->setUniform("u_camera_position", camera->eye);
+	quad_shader->setUniform("u_time", getTime());
+	quad_shader->setUniform("u_occlusion", scene->occlusion);
+	quad_shader->setUniform("u_specular_light", scene->specular_light);
+	quad_shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	quad_shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+
+	//Upload textures
+	quad_shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
+	quad_shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
+	quad_shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
+	quad_shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+	if (scene->SSAO_type == SSAOType::SSAOp)
+	{
+		quad_shader->setTexture("u_ssao_texture", ssao_p_fbo->color_textures[0], 4);
+	}
+	else {
+		quad_shader->setTexture("u_ssao_texture", ssao_fbo->color_textures[0], 4);
+	}
+
+	//Compute lights
+	SinglePassLoop(quad_shader, quad, lights);
+
+	//Disable the shader
+	quad_shader->disable();
+}
+
+void GTR::Renderer::renderSphereIllumination()
+{
+	//Create two lights vectors: One for point and spot lights and another one for directional lights
+	vector<LightEntity*> points_n_spots;
+	vector<LightEntity*> directionals;
+
+	//Loop over the lights vector and assign lights
+	int j = 0;
+	int k = 0;
+	for (auto it = lights.begin(); it != lights.end(); ++it)
+	{
+		//Current light
+		LightEntity* light = *it;
+
+		if (light->light_type == DIRECTIONAL)
+		{
+			directionals.push_back(light);
+			j++;
+		}
+		else
+		{
+			points_n_spots.push_back(light);
+			k++;
+		}
+	}
+
+	/*
+		SPHERE
+	*/
+
+	//Get Sphere shader
+	Shader* sphere_shader = Shader::Get("deferred_illumination_sphere");
+
+	//no shader? then nothing to render
+	if (!sphere_shader)
 		return;
 
 	//Get meshes
-	//Mesh* sphere = Mesh::Get("data/meshes/sphere.obj", false);
-	Mesh* quad = Mesh::getQuad();	
+	Mesh* sphere = Mesh::Get("data/meshes/sphere.obj", false);
 
-	//Select render tpye
-	switch (scene->render_type) {
-	case(Singlepass):
+	//Disable blending for the first iteration
+	glDisable(GL_BLEND);
 
-		//Disable depth test as we are not going to test geometry
-		glDisable(GL_DEPTH_TEST);
+	//Enable depth test
+	glEnable(GL_DEPTH_TEST);
 
-		//Disable blending for the first iteration
-		glDisable(GL_BLEND);
+	//Draw the inner part of the sphere
+	glDepthFunc(GL_GREATER);
 
-		//Enable the shader
-		quad_shader->enable();
+	//Block writing to the ZBuffer so we do not modify it with our geometry
+	glDepthMask(false);
 
-		//Set scene uniforms
-		setIlluminationSceneUniforms(quad_shader);
+	//Enable the shader
+	sphere_shader->enable();
 
-		//Compute lights
-		SinglePassLoop(quad_shader, quad, lights);
+	//Scene support variables
+	Vector2 i_Res = Vector2(1.0 / window_size.x, 1.0 / window_size.y);
+	Matrix44 inv_camera_vp = camera->viewprojection_matrix;
+	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
 
-		//Disable the shader
-		quad_shader->disable();
+	//Set scene uniforms in the shader
+	sphere_shader->setUniform("u_render_type", scene->render_type);
+	sphere_shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
+	sphere_shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
+	sphere_shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
+	sphere_shader->setUniform("u_camera_position", camera->eye);
+	sphere_shader->setUniform("u_time", getTime());
+	sphere_shader->setUniform("u_occlusion", scene->occlusion);
+	sphere_shader->setUniform("u_specular_light", scene->specular_light);
+	sphere_shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	sphere_shader->setUniform("u_num_shadows", (float)scene->num_shadows);
 
-		//Leave case
-		break;
+	//Don't add the emissive lights and the ambient light now
+	sphere_shader->setUniform("u_ambient_light", Vector3());
+	sphere_shader->setUniform("u_emissive_materials", 0);
 
-	case(Multipass):
-		
-		//Create two lights vectors: One for point and spot lights and another one for directional lights
-		vector<LightEntity*> points_n_spots;
-		vector<LightEntity*> directionals;
-
-		//Loop over the lights vector and assign lights
-		int j = 0;
-		int k = 0;
-		for (auto it = lights.begin(); it != lights.end(); ++it)
-		{
-			//Current light
-			LightEntity* light = *it;
-
-			if (light->light_type == DIRECTIONAL)
-			{
-				directionals.push_back(light);
-				j++;
-			}
-			else
-			{
-				points_n_spots.push_back(light);
-				k++;
-			}
-		}
-
-		//Enable depth test
-		glEnable(GL_DEPTH_TEST);
-
-		//Draw the inner part of the sphere
-		//glDepthFunc(GL_GREATER);
-
-		//Block writing to the ZBuffer so we do not modify it with our geometry
-		//glDepthMask(false);
-
-		//Disable blending for the first iteration
-		glDisable(GL_BLEND);
-	
-		/*//Enable the shader
-		sphere_shader->enable();
-
-		//Set scene uniforms
-		setIlluminationSceneUniforms(sphere_shader);
-
-		//Compute lights
-		MultiPassLoop(sphere_shader, sphere, points_n_spots);
-
-		//Disable the shader
-		sphere_shader->disable();
-		*/
-		//Enable blending
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_ONE, GL_ONE);
-
-		//Enable the shader
-		quad_shader->enable();
-
-		//Set scene uniforms
-		setIlluminationSceneUniforms(quad_shader);
-
-		//Compute lights
-		MultiPassLoop(quad_shader, quad, directionals);
-
-		//Disable the shader
-		quad_shader->disable();
-
-		//Leave case
-		break;
-
+	//Upload textures
+	sphere_shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
+	sphere_shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
+	sphere_shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
+	sphere_shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+	if (scene->SSAO_type == SSAOType::SSAOp)
+	{
+		sphere_shader->setTexture("u_ssao_texture", ssao_p_fbo->color_textures[0], 4);
 	}
+	else {
+		sphere_shader->setTexture("u_ssao_texture", ssao_fbo->color_textures[0], 4);
+	}
+
+	//Compute lights
+	MultiPassLoop(sphere_shader, sphere, points_n_spots);
+
+	//Disable the shader
+	sphere_shader->disable();
+
+	/*
+		QUAD
+	*/
+
+	//Get quad shader
+	Shader* quad_shader = Shader::Get("deferred_illumination_quad");
+
+	//no shader? then nothing to render
+	if (!quad_shader)
+		return;
+
+	//Get quad
+	Mesh* quad = Mesh::getQuad();
+
+	//Enable blending
+	glEnable(GL_BLEND);
+
+	//Blending function
+	glBlendFunc(GL_ONE, GL_ONE);
+
+	//Enable depth test
+	glDisable(GL_DEPTH_TEST);
+
+	//Enable the shader
+	quad_shader->enable();
+
+	//Set scene uniforms in the shader
+	quad_shader->setUniform("u_render_type", scene->render_type);
+	quad_shader->setUniform("u_ambient_light", scene->ambient_light);
+	quad_shader->setUniform("u_emissive_materials", scene->emissive_materials);
+	quad_shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
+	quad_shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
+	quad_shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
+	quad_shader->setUniform("u_camera_position", camera->eye);
+	quad_shader->setUniform("u_time", getTime());
+	quad_shader->setUniform("u_occlusion", scene->occlusion);
+	quad_shader->setUniform("u_specular_light", scene->specular_light);
+	quad_shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	quad_shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+
+	//Upload textures
+	quad_shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
+	quad_shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
+	quad_shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
+	quad_shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+	if (scene->SSAO_type == SSAOType::SSAOp)
+	{
+		quad_shader->setTexture("u_ssao_texture", ssao_p_fbo->color_textures[0], 4);
+	}
+	else {
+		quad_shader->setTexture("u_ssao_texture", ssao_fbo->color_textures[0], 4);
+	}
+
+	//Compute lights
+	MultiPassLoop(quad_shader, quad, directionals);
+
+	//Disable the shader
+	quad_shader->disable();
+
 }
 
 //Render objects with transparencies
 void GTR::Renderer::renderTransparentObjects(std::vector<RenderCall*>& transparent_objects)
 {
+
 	//Get forward shader
 	Shader* shader = Shader::Get("forward");
 
@@ -901,6 +1114,7 @@ void GTR::Renderer::renderTransparentObjects(std::vector<RenderCall*>& transpare
 
 	//Upload scene uniforms
 	shader->setUniform("u_render_type", scene->render_type);
+	shader->setUniform("u_ambient_light", scene->ambient_light);
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
 	shader->setUniform("u_time", getTime());
@@ -909,7 +1123,7 @@ void GTR::Renderer::renderTransparentObjects(std::vector<RenderCall*>& transpare
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
 
-	//Enable depth test for blending
+	//Enable depth test
 	glEnable(GL_DEPTH_TEST);
 
 	//Render transparent objects with the forward pipeline
@@ -931,7 +1145,7 @@ void GTR::Renderer::renderTransparentObjects(std::vector<RenderCall*>& transpare
 }
 
 //Deferred illumination shader uniforms
-void GTR::Renderer::setIlluminationSceneUniforms(Shader* shader)
+/*void GTR::Renderer::setIlluminationSceneUniforms(Shader* shader)
 {
 	//Set scene uniforms in the shader
 	Matrix44 camera_vp = camera->viewprojection_matrix;
@@ -954,27 +1168,31 @@ void GTR::Renderer::setIlluminationSceneUniforms(Shader* shader)
 	shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
 	shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
 	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
-	shader->setTexture("u_ssao_texture", ssao_fbo->color_textures[0], 4);
-}
+	if (scene->SSAO_type == SSAOType::SSAOp)
+	{
+		shader->setTexture("u_ssao_texture", ssao_p_fbo->color_textures[0], 4);
+	}
+	else {
+		shader->setTexture("u_ssao_texture", ssao_fbo->color_textures[0], 4);
+	}
+}*/
 
 //We clear in several passes so we can control the clear color independently for every gbuffer
 void GTR::Renderer::clearGBuffers()
 {
-	//Disable all but the GB0 (and the depth)
-	gbuffers_fbo->enableSingleBuffer(0);
+	//Set clear color
+	glClearColor(0.0, 0.0, 0.0, 1.0);
 
-	//Clear GB0 with the color (and depth)
-	glClearColor(0.0, 0.0, 0.0, 0.0);
+	//Disable all but the GB0 and depth and clear them
+	gbuffers_fbo->enableSingleBuffer(0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//Now enable the second GB to clear it
 	gbuffers_fbo->enableSingleBuffer(1);
-	glClearColor(0.0, 0.0, 0.0, 0.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	//Now enable the third GB to clear it
 	gbuffers_fbo->enableSingleBuffer(2);
-	glClearColor(0.0, 0.0, 0.0, 0.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	//Enable all buffers back
@@ -984,16 +1202,15 @@ void GTR::Renderer::clearGBuffers()
 //We clear in several passes so we can control the clear color independently for every illumination buffer
 void GTR::Renderer::clearIlluminationBuffers()
 {
-	//Disable all but the GB0 (and the depth)
-	illumination_fbo->enableSingleBuffer(0);
-
-	//Clear GB0 with the color (and depth)
+	//Set clear color
 	glClearColor(0.0, 0.0, 0.0, 1.0);
+
+	//Disable all but the GB0 and depth and clear them
+	illumination_fbo->enableSingleBuffer(0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//Now enable the second GB to clear it
 	illumination_fbo->enableSingleBuffer(1);
-	glClearColor(0.0, 0.0, 0.0, 0.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	//Enable all buffers back
@@ -1054,7 +1271,7 @@ void GTR::Renderer::showBuffers()
 
 			//Emissive region
 			glViewport(emissive_region.x, emissive_region.y, emissive_region.z, emissive_region.w);
-			viewportEmissive();		
+			viewportEmissive();
 
 			//Result screen
 			glViewport(result_region.x, result_region.y, result_region.z, result_region.w);
@@ -1071,7 +1288,7 @@ void GTR::Renderer::viewportEmissive()
 	Shader* shader = Shader::Get("emissive");
 	if (!shader)
 		return;
-	
+
 	//Create a quead
 	Mesh* quad = Mesh::getQuad();
 
@@ -1313,7 +1530,6 @@ void GTR::Renderer::computeDirectionalShadowMap(LightEntity* light, Camera* came
 	glViewport(0, 0, window_size.x, window_size.y);
 	glColorMask(true, true, true, true);
 	glDisable(GL_SCISSOR_TEST);
-
 }
 
 //Render teh depth map
@@ -1375,19 +1591,19 @@ void GTR::Renderer::showShadowAtlas()
 	//Just in case
 	if (!scene->shadow_atlas || scene->num_shadows == 0)
 		return;
-	
+
 	//Some variables
 	int num_shadows = scene->num_shadows;
 	int num_shadows_per_scope = min(num_shadows, window_size.x / SHOW_ATLAS_RESOLUTION); //Number of shadow maps that will be displayed at the same time (within a scope).
-	int shadow_scope = clamp(scene->atlas_scope,0,ceil(num_shadows / (float)num_shadows_per_scope) - 1); //Current shadow scope.
+	int shadow_scope = clamp(scene->atlas_scope, 0, ceil(num_shadows / (float)num_shadows_per_scope) - 1); //Current shadow scope.
 	int num_shadows_in_scope = min(num_shadows - shadow_scope * num_shadows_per_scope, num_shadows_per_scope); //Number of shadows in the current scope
-	int shadow_offset = (window_size.x - num_shadows_in_scope * SHOW_ATLAS_RESOLUTION)/2; //In order to place the shadow maps in the center of the horizontal axis.
+	int shadow_offset = (window_size.x - num_shadows_in_scope * SHOW_ATLAS_RESOLUTION) / 2; //In order to place the shadow maps in the center of the horizontal axis.
 	int starting_shadow = shadow_scope * num_shadows_per_scope;
 	int final_shadow = starting_shadow + num_shadows_in_scope;
 
-	for (int i = 0; i < lights.size(); ++i) 
+	for (int i = 0; i < lights.size(); ++i)
 	{
-		if (lights[i]->cast_shadows) 
+		if (lights[i]->cast_shadows)
 		{
 			//Only render if lights are in the right scope
 			if (starting_shadow <= lights[i]->shadow_index && lights[i]->shadow_index < final_shadow)
