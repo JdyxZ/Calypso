@@ -129,6 +129,9 @@ namespace GTR {
 		bool show_buffers;
 		bool toggle_buffers;
 
+		//SSAO
+		bool show_ssao;
+
 		//Shadow atlas
 		int atlas_resolution_index; //The corresponding index in the array of shadow atlas resolutions
 		int atlas_scope; //The current shadow scope in case that all shadow maps doesn't fit into the screen.

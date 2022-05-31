@@ -292,6 +292,7 @@ void Application::renderDebugGUI(void)
 	if(scene->render_pipeline == GTR::RenderPipeline::Deferred)
 		ImGui::Checkbox("GBuffers", &scene->show_buffers);
 
+	ImGui::Checkbox("Show SSAO", &scene->show_ssao);
 	//Shadow resolution
 	scene->shadow_resolution_trigger = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, shadow_resolutions, IM_ARRAYSIZE(shadow_resolutions));
 

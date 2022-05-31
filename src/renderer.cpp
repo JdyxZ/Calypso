@@ -52,6 +52,9 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	shadow_fbo = NULL;
 	gbuffers_fbo = NULL;
 	illumination_fbo = NULL;
+	ssao_fbo = NULL;
+
+	rand_points = generateSpherePoints(64, 1, false);
 
 	//Windows size
 	window_size = Vector2(window_width, window_height);
@@ -530,6 +533,10 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 //Deferred pipeline
 void GTR::Renderer::renderDeferred()
 {
+	Mesh* quad = Mesh::getQuad();
+	Matrix44 inv_vp = camera->viewprojection_matrix;
+	inv_vp.inverse();
+
 	/*
 		GBUFFERS
 	*/
@@ -635,9 +642,65 @@ void GTR::Renderer::renderDeferred()
 	//Stop rendering to the illumination fbo
 	illumination_fbo->unbind();
 
+	/*
+
+		   SSAO
+
+   */
+
+   //Crete the ssao fbo if they don't exist yet
+	if (!ssao_fbo)
+	{
+		//Create a new FBO
+		ssao_fbo = new FBO();
+
+		//Create three textures of four components
+		ssao_fbo->create(window_size.x, window_size.y,
+			3,                     //three textures
+			GL_RGBA,             //four channels
+			GL_UNSIGNED_BYTE,    //1 byte
+			false);                //add depth_texture
+
+	}
+
+	//Start rendering inside the ssao fbo
+	ssao_fbo->bind();
+
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+
+	//Get the ssao shader
+	
+	shader = Shader::Get("ssao");
+	shader->enable();
+
+
+	shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 0);
+	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 1);
+	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	shader->setUniform("u_inverse_viewprojection", inv_vp);
+	shader->setUniform("u_iRes", Vector2(1.0 / (float)window_size.x, 1.0 / (float)window_size.y));
+	shader->setUniform3Array("u_points", (float*)&rand_points[0], rand_points.size());
+
+	quad->render(GL_TRIANGLES);
+
+	//Stop rendering to the ssao fbo
+	ssao_fbo->unbind();
+
 	//Show Buffers or render the final frame
 	if (scene->show_buffers)
 		showBuffers();
+	else
+	{
+		//Reset viewport
+		glViewport(0, 0, window_size.x, window_size.y);
+
+		//Final frame
+		illumination_fbo->color_textures[0]->toViewport();
+	}
+
+	if (scene->show_ssao)
+		ssao_fbo->color_textures[0]->toViewport();
 	else
 	{
 		//Reset viewport
@@ -1380,3 +1443,30 @@ Texture* GTR::CubemapFromHDRE(const char* filename)
 		}
 	return texture;
 }
+
+// <--------------------------------------------------- SpherePoints --------------------------------------------------->
+std::vector<Vector3> GTR::generateSpherePoints(int num,	float radius, bool hemi)
+{
+	std::vector<Vector3> points;
+	points.resize(num);
+	for (int i = 0; i < num; i += 1)
+	{
+		Vector3& p = points[i];
+		float u = random();
+		float v = random();
+		float theta = u * 2.0 * PI;
+		float phi = acos(2.0 * v - 1.0);
+		float r = cbrt(random() * 0.9 + 0.1) * radius;
+		float sinTheta = sin(theta);
+		float cosTheta = cos(theta);
+		float sinPhi = sin(phi);
+		float cosPhi = cos(phi);
+		p.x = r * sinPhi * cosTheta;
+		p.y = r * sinPhi * sinTheta;
+		p.z = r * cosPhi;
+		if (hemi && p.z < 0)
+			p.z *= -1.0;
+	}
+	return points;
+}
+

@@ -34,6 +34,9 @@ GTR::Scene::Scene()
 	show_buffers = false;
 	toggle_buffers = false;
 
+	//SSAO debugging
+	show_ssao = false;
+
 	//Shadow atlas debugging
 	atlas_resolution_index = 2; //Set by default 2048 x 2048 resolution
 	show_atlas = false;

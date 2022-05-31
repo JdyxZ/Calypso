@@ -37,10 +37,13 @@ namespace GTR {
 		FBO* shadow_fbo;
 		FBO* gbuffers_fbo;
 		FBO* illumination_fbo;
+		FBO* ssao_fbo;
 
 		//Render variables
 		std::vector<LightEntity*> lights; //Here we store each Light to be sent to the Shadder.
 		std::vector<RenderCall*> render_calls; // Here we store each RenderCall to be sent to the Shadder.
+
+		std::vector<Vector3> rand_points;
 
 		//Shadow Resolution
 		int shadow_map_resolution = 2048; //Default Resolution
@@ -87,5 +90,8 @@ namespace GTR {
 
 	//Cubemap
 	Texture* CubemapFromHDRE(const char* filename);
+
+	//SpherePoints
+	std::vector<Vector3> generateSpherePoints(int num, float radius, bool hemi);
 
 };
