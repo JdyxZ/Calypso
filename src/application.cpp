@@ -605,6 +605,7 @@ void Application::onResize(int width, int height)
 	camera->aspect =  width / (float)height;
 	window_width = width;
 	window_height = height;
+	scene->resolution_trigger = true;
 	renderer->window_size = Vector2(width, height);
 }
 

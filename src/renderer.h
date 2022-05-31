@@ -67,7 +67,9 @@ namespace GTR {
 		//Deferred pipeline
 		void renderDeferred();
 		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera); 
-		void renderDeferredIllumination(); 
+		void renderDeferredIllumination();
+		void renderQuadIllumination();
+		void renderSphereIllumination();
 		void renderTransparentObjects(std::vector<RenderCall*>& transparent_objects); 
 		void setIlluminationSceneUniforms(Shader* shader); 
 		void clearGBuffers(); 
