@@ -64,9 +64,12 @@ void Renderer::renderScene()
 	//Set the render calls and lights of the renderer
 	processScene();
 
-	//If there aren't lights in the scene don't render nothing
+	//If there aren't lights in the scene render a scene without lights
 	if (lights.empty())
+	{
+		renderWithoutLights();
 		return;
+	}
 
 	//Update Shadow Atlas: We create a dynamic atlas to be resizable
 	updateShadowAtlas();
@@ -97,14 +100,15 @@ void Renderer::renderScene()
 //Create or update render calls vector
 void Renderer::processScene()
 {
-	//Clear the render call vector and the light vector
-	render_calls.clear();
+	//Clear renderer vectors
 	lights.clear();
+	render_calls.clear();
+	transparent_objects.clear();
 
 	//Generate render calls and fill the light vector
-	for (int i = 0; i < scene->entities.size(); ++i)
+	for (auto it = scene->entities.begin(); it != scene->entities.end(); ++it)
 	{
-		BaseEntity* ent = scene->entities[i];
+		BaseEntity* ent = *it;
 		if (!ent->visible)
 			continue;
 
@@ -170,6 +174,108 @@ void Renderer::processNode(const Matrix44& prefab_model, GTR::Node* node, Camera
 }
 
 //< --------------------------------------------------- Pipeline globals --------------------------------------------------->
+
+//Render without lights
+void GTR::Renderer::renderWithoutLights()
+{
+	//Set the clear color (the background color)
+	glClearColor(scene->background_color.x, scene->background_color.y, scene->background_color.z, 1.0);
+
+	// Clear the color and the depth buffer
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	assert(checkGLErrors() && "An error has been produced cleaning the background");
+
+	//Enable the camera to upload camera uniforms
+	camera->enable();
+
+	//Create a new shader
+	Shader* shader = Shader::Get("nolights");
+	assert(glGetError() == GL_NO_ERROR);
+
+	//no shader? then nothing to render
+	if (!shader)
+		return;
+
+	//Enable the shader
+	shader->enable();
+
+	//Upload scene uniforms
+	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	shader->setUniform("u_emissive_materials", scene->emissive_materials);
+	shader->setUniform("u_time", getTime());
+
+	//Send render calls to the GPU
+	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
+	{
+		//Current render call
+		RenderCall* rc = *it;
+
+		//If bounding box is inside the camera frustum then the prefab is probably visible
+		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
+		{
+			//In case there is nothing to do
+			if (!rc->mesh || !rc->mesh->getNumVertices() || !rc->material)
+				return;
+
+			assert(glGetError() == GL_NO_ERROR);
+
+			//Only render color texture and emissive materials
+			Texture* color_texture = NULL;
+			Texture* emissive_texture = NULL;
+
+			//Get textures
+			color_texture = rc->material->color_texture.texture;
+			emissive_texture = rc->material->emissive_texture.texture;
+
+			//Just in case		
+			if (color_texture == NULL) color_texture = Texture::getWhiteTexture(); 
+			if (emissive_texture == NULL) emissive_texture = Texture::getBlackTexture();
+
+			//Upload prefab uniforms
+			shader->setMatrix44("u_model", rc->model);
+			shader->setUniform("u_color", rc->material->color);
+			shader->setUniform("u_alpha_cutoff", rc->material->alpha_mode == GTR::eAlphaMode::MASK ? rc->material->alpha_cutoff : 0); //this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
+			shader->setUniform("u_emissive_factor", rc->material->emissive_factor);
+
+			//Upload textures
+			if(color_texture) shader->setTexture("u_color_texture", color_texture, 0);
+			if (emissive_texture && scene->emissive_materials) shader->setTexture("u_emissive_texture", emissive_texture, 1);
+
+			//Enable depth test
+			glEnable(GL_DEPTH_TEST);
+
+			//Select the blending
+			if (rc->material->alpha_mode == GTR::eAlphaMode::BLEND)
+			{
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				glDepthFunc(GL_LEQUAL);
+			}
+			else
+			{
+				glDisable(GL_BLEND);
+				glDepthFunc(GL_LESS);
+			}
+
+			//Select if render both sides of the triangles
+			if (rc->material->two_sided)
+				glDisable(GL_CULL_FACE);
+			else
+				glEnable(GL_CULL_FACE);
+			assert(glGetError() == GL_NO_ERROR);
+
+			//Do the draw call that renders the mesh into the screen
+			rc->mesh->render(GL_TRIANGLES);
+		}
+	}
+
+	//Disable the shader
+	shader->disable();
+
+	//Set the render state as it was before to avoid problems with future renders
+	glDisable(GL_BLEND);
+	glDepthFunc(GL_LESS);
+}
 
 //Singlepass lighting
 void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh, std::vector<LightEntity*>& lights_vector)
@@ -421,7 +527,7 @@ void GTR::Renderer::renderForward()
 
 	// Clear the color and the depth buffer
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	checkGLErrors();
+	assert(checkGLErrors() && "An error has been produced cleaning the background");
 	
 	//Create a new shader
 	Shader* shader = Shader::Get("forward");
@@ -444,11 +550,11 @@ void GTR::Renderer::renderForward()
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
 
-	//Send the render calls to the GPU
-	for (int i = 0; i < render_calls.size(); i++)
+	//Send render calls to the GPU
+	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
 	{
 		//Current render call
-		RenderCall* rc = render_calls[i];
+		RenderCall* rc = *it;
 
 		//If bounding box is inside the camera frustum then the prefab is probably visible
 		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
@@ -493,22 +599,6 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 	if (scene->normal_mapping) entity_has_normal_map = (normal_texture == NULL) ? 0 : 1;
 	else entity_has_normal_map = 0;
 
-	//Select the blending
-	if (rc->material->alpha_mode == GTR::eAlphaMode::BLEND)
-	{
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	}
-	else glDisable(GL_BLEND);
-
-	//Enable blending support
-	glDepthFunc(GL_LEQUAL);
-
-	//Select whether to render both sides of the triangles
-	if (rc->material->two_sided) glDisable(GL_CULL_FACE);
-	else glEnable(GL_CULL_FACE);
-	assert(glGetError() == GL_NO_ERROR);
-
 	//Upload textures
 	if(color_texture) shader->setTexture("u_color_texture", color_texture, 0);
 	if (scene->emissive_materials) shader->setTexture("u_emissive_texture", emissive_texture, 1);
@@ -522,6 +612,26 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 	shader->setUniform("u_alpha_cutoff", rc->material->alpha_mode == GTR::eAlphaMode::MASK ? rc->material->alpha_cutoff : 0); //this is used to say which is the alpha threshold to what we should not paint a pixel on the screen (to cut polygons according to texture alpha)
 	shader->setUniform("u_normal_mapping", entity_has_normal_map);
 	shader->setUniform("u_emissive_factor", rc->material->emissive_factor);
+
+	//Enable depth test
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+
+	//Select the blending
+	if (rc->material->alpha_mode == GTR::eAlphaMode::BLEND)
+	{
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
+	else
+	{
+		glDisable(GL_BLEND);
+	}
+
+	//Select whether to render both sides of the triangles
+	if (rc->material->two_sided) glDisable(GL_CULL_FACE);
+	else glEnable(GL_CULL_FACE);
+	assert(glGetError() == GL_NO_ERROR);
 
 	//Select render tpye
 	switch (scene->render_type) {
@@ -539,10 +649,29 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 //Deferred pipeline
 void GTR::Renderer::renderDeferred()
 {
-	/*
-		GBUFFERS
-	*/
+	
+	//Create and render the GBuffers
+	GBuffers();
+	//Illumination and transparencies
+	IlluminationNTransparencies();
 
+	//Show Buffers or render the final frame
+	if (scene->show_buffers)
+		showBuffers();
+	else
+	{
+		//Reset viewport
+		glViewport(0, 0, window_size.x, window_size.y);
+
+		//Final frame
+		illumination_fbo->color_textures[0]->toViewport();
+	}
+	
+}
+
+//GBuffers
+void GTR::Renderer::GBuffers()
+{
 	//Crete the gbuffers fbo if they don't exist yet
 	if (!gbuffers_fbo || scene->resolution_trigger)
 	{
@@ -585,24 +714,22 @@ void GTR::Renderer::renderDeferred()
 	shader->setUniform("u_camera_position", camera->eye);
 	shader->setUniform("u_time", getTime());
 
-	//Create a vector for transparent objects, to render them at the end of the pipeline
-	vector<RenderCall*> transparent_objects;
-
 	//Send render calls to the GPU
-	for (int i = 0; i < render_calls.size(); i++)
+	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
 	{
 		//Current render call
-		RenderCall* rc = render_calls[i];
+		RenderCall* rc = *it;
 
 		//If bounding box is inside the camera frustum then the prefab is probably visible
 		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
 		{
 			if (rc->material->alpha_mode == BLEND)
 			{
+				//Add transparent objects to render them at the end of the pipeline
 				transparent_objects.push_back(rc);
 				continue;
 			}
-			
+
 			renderGBuffers(shader, rc, camera);
 		}
 	}
@@ -612,63 +739,28 @@ void GTR::Renderer::renderDeferred()
 
 	//Stop rendering to the gbuffers fbo
 	gbuffers_fbo->unbind();
+}
 
-	/*
-	
-		ILLUMINATION & BLENDING
-	
-	*/
+//We clear in several passes so we can control the clear color independently for every gbuffer
+void GTR::Renderer::clearGBuffers()
+{
+	//Set clear color
+	glClearColor(0.0, 0.0, 0.0, 1.0);
 
-	//Crete the illumination fbo if they don't exist yet
-	if (!illumination_fbo || scene->resolution_trigger)
-	{
-		if (illumination_fbo)
-		{
-			delete illumination_fbo;
-			illumination_fbo = NULL;
-		}
+	//Disable all but the GB0 and depth and clear them
+	gbuffers_fbo->enableSingleBuffer(0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		//Create a new FBO
-		illumination_fbo = new FBO();
+	//Now enable the second GB to clear it
+	gbuffers_fbo->enableSingleBuffer(1);
+	glClear(GL_COLOR_BUFFER_BIT);
 
-		//Create one texture with RGB components
-		illumination_fbo->create(window_size.x, window_size.y,
-			2, 					//two texture
-			GL_RGB, 			//three channels
-			GL_UNSIGNED_BYTE,	//1 byte
-			true);				//add depth_texture
-	}
+	//Now enable the third GB to clear it
+	gbuffers_fbo->enableSingleBuffer(2);
+	glClear(GL_COLOR_BUFFER_BIT);
 
-	//Start rendering inside the illumination fbo
-	illumination_fbo->bind();
-
-	//Clear all buffers
-	clearIlluminationBuffers();
-
-	//Copy the gbuffers depth texture to enable depth testing in illumination fbo
-	gbuffers_fbo->depth_texture->copyTo(NULL);
-
-	//Render lights into the ilumination fbo
-	renderDeferredIllumination();
-
-	//Render objects with blending in forward pipeline
-	renderTransparentObjects(transparent_objects);
-
-	//Stop rendering to the illumination fbo
-	illumination_fbo->unbind();
-
-	//Show Buffers or render the final frame
-	if (scene->show_buffers)
-		showBuffers();
-	else
-	{
-		//Reset viewport
-		glViewport(0, 0, window_size.x, window_size.y);
-
-		//Final frame
-		illumination_fbo->color_textures[0]->toViewport();
-	}
-	
+	//Enable all buffers back
+	gbuffers_fbo->enableAllBuffers();
 }
 
 //Fill the GBuffers
@@ -721,14 +813,81 @@ void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camer
 	shader->setUniform("u_normal_mapping", entity_has_normal_map);
 	shader->setUniform("u_emissive_factor", rc->material->emissive_factor);
 
+	//Enable depth test
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+
+	//Select whether to render both sides of the triangles
+	if (rc->material->two_sided) glDisable(GL_CULL_FACE);
+	else glEnable(GL_CULL_FACE);
+	assert(glGetError() == GL_NO_ERROR);
+
 	//Do the draw call that renders the mesh into the screen
 	rc->mesh->render(GL_TRIANGLES);
 
 	//Set the render state as it was before to avoid problems with future renders
-	glDisable(GL_BLEND);
 	glDisable(GL_CULL_FACE);
-	glDepthFunc(GL_LESS);
 
+}
+
+//Computes illumination and transparent objects
+void GTR::Renderer::IlluminationNTransparencies()
+{
+	//Crete the illumination fbo if they don't exist yet
+	if (!illumination_fbo || scene->resolution_trigger)
+	{
+		if (illumination_fbo)
+		{
+			delete illumination_fbo;
+			illumination_fbo = NULL;
+		}
+
+		//Create a new FBO
+		illumination_fbo = new FBO();
+
+		//Create one texture with RGB components
+		illumination_fbo->create(window_size.x, window_size.y,
+			2, 					//two texture
+			GL_RGB, 			//three channels
+			GL_UNSIGNED_BYTE,	//1 byte
+			true);				//add depth_texture
+	}
+
+	//Start rendering inside the illumination fbo
+	illumination_fbo->bind();
+
+	//Clear all buffers
+	clearIlluminationBuffers();
+
+	//Copy the gbuffers depth texture to enable depth testing in illumination fbo
+	gbuffers_fbo->depth_texture->copyTo(NULL);
+
+	//Render lights into the ilumination fbo
+	renderDeferredIllumination();
+
+	//Render objects with blending in forward pipeline
+	renderTransparentObjects();
+
+	//Stop rendering to the illumination fbo
+	illumination_fbo->unbind();
+}
+
+//We clear in several passes so we can control the clear color independently for every illumination buffer
+void GTR::Renderer::clearIlluminationBuffers()
+{
+	//Set clear color
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+
+	//Disable all but the GB0 and depth and clear them
+	illumination_fbo->enableSingleBuffer(0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//Now enable the second GB to clear it
+	illumination_fbo->enableSingleBuffer(1);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	//Enable all buffers back
+	illumination_fbo->enableAllBuffers();
 }
 
 //Render the deferred illumination
@@ -745,6 +904,7 @@ void GTR::Renderer::renderDeferredIllumination()
 	}
 }
 
+//Singlepass quad render
 void GTR::Renderer::renderQuadIllumination()
 {
 	//Get shaders
@@ -756,15 +916,6 @@ void GTR::Renderer::renderQuadIllumination()
 
 	//Get mesh
 	Mesh* quad = Mesh::getQuad();
-
-	//Disable blending for the first iteration
-	glDisable(GL_BLEND);
-
-	//Block writing to the ZBuffer so we do not modify it with our geometry
-	glDepthMask(false);
-
-	//Disable depth test as we are not going to test geometry
-	glDisable(GL_DEPTH_TEST);
 
 	//Enable the shader
 	quad_shader->enable();
@@ -794,6 +945,15 @@ void GTR::Renderer::renderQuadIllumination()
 	quad_shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
 	quad_shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
 
+	//Disable blending for the first iteration
+	glDisable(GL_BLEND);
+
+	//Disable depth test as we are not going to test geometry
+	glDisable(GL_DEPTH_TEST);
+
+	//Block writing to the ZBuffer so we do not modify it with our geometry
+	glDepthMask(false);
+
 	//Compute lights
 	SinglePassLoop(quad_shader, quad, lights);
 
@@ -801,6 +961,7 @@ void GTR::Renderer::renderQuadIllumination()
 	quad_shader->disable();
 }
 
+//Multipass light volume render for point lights and spotlights and quad render for directional lights
 void GTR::Renderer::renderSphereIllumination()
 {
 	//Create two lights vectors: One for point and spot lights and another one for directional lights
@@ -841,18 +1002,6 @@ void GTR::Renderer::renderSphereIllumination()
 	//Get meshes
 	Mesh* sphere = Mesh::Get("data/meshes/sphere.obj", false);
 
-	//Disable blending for the first iteration
-	glDisable(GL_BLEND);
-
-	//Enable depth test
-	glEnable(GL_DEPTH_TEST);
-
-	//Draw the inner part of the sphere
-	glDepthFunc(GL_GREATER);
-
-	//Block writing to the ZBuffer so we do not modify it with our geometry
-	glDepthMask(false);
-
 	//Enable the shader
 	sphere_shader->enable();
 
@@ -883,6 +1032,18 @@ void GTR::Renderer::renderSphereIllumination()
 	sphere_shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
 	sphere_shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
 
+	//Disable blending for the first iteration
+	glDisable(GL_BLEND);
+
+	//Enable depth test
+	glEnable(GL_DEPTH_TEST);
+
+	//Draw the inner part of the sphere
+	glDepthFunc(GL_GREATER);
+
+	//Block writing to the ZBuffer so we do not modify it with our geometry
+	glDepthMask(false);
+
 	//Compute lights
 	MultiPassLoop(sphere_shader, sphere, points_n_spots);
 
@@ -902,15 +1063,6 @@ void GTR::Renderer::renderSphereIllumination()
 
 	//Get quad
 	Mesh* quad = Mesh::getQuad();
-
-	//Enable blending
-	glEnable(GL_BLEND);
-
-	//Blending function
-	glBlendFunc(GL_ONE, GL_ONE);
-
-	//Enable depth test
-	glDisable(GL_DEPTH_TEST);
 
 	//Enable the shader
 	quad_shader->enable();
@@ -935,6 +1087,18 @@ void GTR::Renderer::renderSphereIllumination()
 	quad_shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
 	quad_shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
 
+	//Enable blending
+	glEnable(GL_BLEND);
+
+	//Blending function
+	glBlendFunc(GL_ONE, GL_ONE);
+
+	//Enable depth test
+	glDisable(GL_DEPTH_TEST);
+
+	//Block writing to the ZBuffer so we do not modify it with our geometry
+	glDepthMask(false);
+
 	//Compute lights
 	MultiPassLoop(quad_shader, quad, directionals);
 
@@ -944,7 +1108,7 @@ void GTR::Renderer::renderSphereIllumination()
 }
 
 //Render objects with transparencies
-void GTR::Renderer::renderTransparentObjects(std::vector<RenderCall*>& transparent_objects)
+void GTR::Renderer::renderTransparentObjects()
 {
 	//Get forward shader
 	Shader* shader = Shader::Get("forward");
@@ -986,46 +1150,6 @@ void GTR::Renderer::renderTransparentObjects(std::vector<RenderCall*>& transpare
 	//Disable shader
 	shader->disable();
 
-}
-
-//We clear in several passes so we can control the clear color independently for every gbuffer
-void GTR::Renderer::clearGBuffers()
-{
-	//Set clear color
-	glClearColor(0.0, 0.0, 0.0, 1.0);
-
-	//Disable all but the GB0 and depth and clear them
-	gbuffers_fbo->enableSingleBuffer(0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	//Now enable the second GB to clear it
-	gbuffers_fbo->enableSingleBuffer(1);
-	glClear(GL_COLOR_BUFFER_BIT);
-
-	//Now enable the third GB to clear it
-	gbuffers_fbo->enableSingleBuffer(2);
-	glClear(GL_COLOR_BUFFER_BIT);
-
-	//Enable all buffers back
-	gbuffers_fbo->enableAllBuffers();
-}
-
-//We clear in several passes so we can control the clear color independently for every illumination buffer
-void GTR::Renderer::clearIlluminationBuffers()
-{
-	//Set clear color
-	glClearColor(0.0, 0.0, 0.0, 1.0);
-
-	//Disable all but the GB0 and depth and clear them
-	illumination_fbo->enableSingleBuffer(0);
-	glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
-
-	//Now enable the second GB to clear it
-	illumination_fbo->enableSingleBuffer(1);
-	glClear(GL_COLOR_BUFFER_BIT);
-
-	//Enable all buffers back
-	illumination_fbo->enableAllBuffers();
 }
 
 //Show the gbuffers and the illumination buffers
@@ -1134,12 +1258,17 @@ void GTR::Renderer::updateShadowAtlas()
 	{
 		scene->num_shadows = 0;
 		int shadow_index = 0;
-		for (int i = 0; i < lights.size(); i++)
+
+		//Iterate over light vector
+		for (auto it = lights.begin(); it != lights.end(); ++it)
 		{
-			if (lights[i]->cast_shadows)
+			//Current light
+			LightEntity* light = *it;
+
+			if (light->cast_shadows)
 			{
 				//Assign a shadow slot for shadow atlas
-				lights[i]->shadow_index = shadow_index;
+				light->shadow_index = shadow_index;
 
 				//Update
 				scene->num_shadows++;
@@ -1186,10 +1315,10 @@ void GTR::Renderer::computeShadowAtlas()
 	if (shadow_fbo && scene->shadow_atlas)
 	{
 		//Iterate over light vector
-		for (int i = 0; i < lights.size(); i++)
+		for (auto it = lights.begin(); it != lights.end(); ++it)
 		{
 			//Current light
-			LightEntity* light = lights[i];
+			LightEntity* light = *it;
 
 			//Booleans
 			bool compute_spot = light->light_type == SPOT && light->cast_shadows && (scene->prefab_trigger || scene->light_trigger || scene->entity_trigger || light->spot_shadow_trigger || scene->shadow_visibility_trigger || scene->shadow_resolution_trigger);
@@ -1254,10 +1383,11 @@ void GTR::Renderer::computeSpotShadowMap(LightEntity* light)
 	//Enable camera
 	light_camera->enable();
 
-	for (int i = 0; i < render_calls.size(); ++i)
+	//Iterate over render calls vector
+	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
 	{
 		//Current render call
-		RenderCall* rc = render_calls[i];
+		RenderCall* rc = *it;
 
 		if (rc->material->alpha_mode == eAlphaMode::BLEND)
 			continue;
@@ -1323,9 +1453,12 @@ void GTR::Renderer::computeDirectionalShadowMap(LightEntity* light, Camera* came
 	//Enable camera
 	light_camera->enable();
 
-	for (int i = 0; i < render_calls.size(); ++i)
+	//Iterate over render calls vector
+	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
 	{
-		RenderCall* rc = render_calls[i];
+		//Current render call
+		RenderCall* rc = *it;
+
 		if (rc->material->alpha_mode == eAlphaMode::BLEND)
 			continue;
 
@@ -1413,16 +1546,17 @@ void GTR::Renderer::showShadowAtlas()
 	int starting_shadow = shadow_scope * num_shadows_per_scope;
 	int final_shadow = starting_shadow + num_shadows_in_scope;
 
-	for (int i = 0; i < lights.size(); ++i) 
+	//Iterate over light vector
+	for (auto it = lights.begin(); it != lights.end(); ++it)
 	{
-		if (lights[i]->cast_shadows) 
+		//Current light
+		LightEntity* light = *it;
+
+		if (light->cast_shadows)
 		{
 			//Only render if lights are in the right scope
-			if (starting_shadow <= lights[i]->shadow_index && lights[i]->shadow_index < final_shadow)
+			if (starting_shadow <= light->shadow_index && light->shadow_index < final_shadow)
 			{
-				//Current Light
-				LightEntity* light = lights[i];
-
 				//Map shadow map into screen coordinates
 				glViewport((light->shadow_index - starting_shadow) * SHOW_ATLAS_RESOLUTION + shadow_offset, 0, SHOW_ATLAS_RESOLUTION, SHOW_ATLAS_RESOLUTION);
 

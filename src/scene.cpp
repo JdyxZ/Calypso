@@ -27,7 +27,6 @@ GTR::Scene::Scene()
 	normal_mapping = true;
 	render_pipeline = Deferred;
 	render_type = Singlepass;
-	shadow_sorting = false;
 	num_shadows = 0;
 
 	//GBuffers debugging

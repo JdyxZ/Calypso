@@ -1,3 +1,6 @@
+//No lights
+nolights pixel.vs nolights.fs
+
 //Forward pipeline shaders
 forward pixel.vs forward.fs
 
@@ -332,7 +335,6 @@ vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
 	return phong_light;
 }
 
-
 \pixel.vs
 
 #version 330 core
@@ -365,6 +367,53 @@ void main()
 
 	//Calculate the position of the vertex using the matrices
 	gl_Position = u_viewprojection * vec4( v_world_position, 1.0 );
+}
+
+\nolights.fs
+
+#version 330 core
+
+//Interpolated variables
+in vec2 v_uv;
+
+//Textures
+uniform sampler2D u_color_texture;
+uniform sampler2D u_emissive_texture;
+
+//Scene uniforms
+uniform float u_time;
+uniform bool u_emissive_materials;
+
+//Prefab uniforms
+uniform vec4 u_color;
+uniform float u_alpha_cutoff;
+uniform bool u_normal_mapping;
+uniform vec3 u_emissive_factor;
+
+//Output
+out vec4 FragColor;
+
+void main()
+{
+	//Material color
+	vec4 color = u_color;
+
+	//Load color texture values with texture interpolated coordinates
+	color *= texture2D( u_color_texture, v_uv );	
+
+	//Mask
+	if(color.a < u_alpha_cutoff)
+		discard;
+
+	//Emissive materials
+	if(u_emissive_materials)
+	{
+		vec3 emissive_light = u_emissive_factor * texture2D(u_emissive_texture,v_uv).xyz;
+		color.rgb += emissive_light;
+	}
+
+	FragColor = color;
+
 }
 
 \forward.fs
@@ -437,6 +486,8 @@ void main()
 		vec3 emissive_light = u_emissive_factor * texture2D(u_emissive_texture,v_uv).xyz;
 		color.rgb += emissive_light;
 	}
+
+	//Output
 	FragColor = color;
 }
 
@@ -577,10 +628,6 @@ void main()
 	vec3 tangent_space_normal = texture2D( u_normal_texture, v_uv ).xyz; 
 	vec3 omr = texture2D(u_omr_texture,v_uv).xyz;
 	vec3 emissive_light = u_emissive_factor * texture2D(u_emissive_texture,v_uv).xyz;
-
-	//ZBuffer-Test
-	if(color.a < u_alpha_cutoff)
-		discard;
 
 	//Interpolated normal
 	vec3 interpolated_normal = normalize(v_normal);

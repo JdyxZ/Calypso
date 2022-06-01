@@ -27,3 +27,14 @@ Roughness y metallness son floats.
 Roughness -> Factor alpha
 Metalness -> Cantidad de specular
 Occlusion texture -> Cantidad de luz ambiente que le llega a un objeto
+
+LAB 2
+
+Deferred
+
+- Artefacto negro de mover la cámara.
+- Se puede utilizar Singlepass para pintar en esferas? 
+- Como añadimos la luz ambiente si solo renderizamos en esferas? ya que si quitamos la directional light nunca se añade.
+- Texture de hojas.
+- glDepthFunc(GL_LEQUAL) todo el rato?
+- Cómo ver el árbol de errores en visual.

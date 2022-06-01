@@ -41,6 +41,7 @@ namespace GTR {
 		//Render variables
 		std::vector<LightEntity*> lights; //Here we store each Light to be sent to the Shadder.
 		std::vector<RenderCall*> render_calls; // Here we store each RenderCall to be sent to the Shadder.
+		std::vector<RenderCall*> transparent_objects; //Here we store the RenderCalls of the objects that need blending (for Deferred pipeline)
 
 		//Shadow Resolution
 		int shadow_map_resolution = 2048; //Default Resolution
@@ -57,6 +58,7 @@ namespace GTR {
 		void processNode(const Matrix44& model, GTR::Node* node, Camera* camera); //Processes one node from the prefab and its children
 
 		//Pipeline globals
+		void renderWithoutLights();
 		void SinglePassLoop(Shader* shader, Mesh* mesh, std::vector<LightEntity*>& lights_vector);//Singlepass lighting
 		void MultiPassLoop(Shader* shader, Mesh* mesh, std::vector<LightEntity*>& lights_vector); //Multipass lighting
 
@@ -66,12 +68,13 @@ namespace GTR {
 
 		//Deferred pipeline
 		void renderDeferred();
-		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera); 
+		void GBuffers();
+		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera);
+		void IlluminationNTransparencies();
 		void renderDeferredIllumination();
 		void renderQuadIllumination();
 		void renderSphereIllumination();
-		void renderTransparentObjects(std::vector<RenderCall*>& transparent_objects); 
-		void setIlluminationSceneUniforms(Shader* shader); 
+		void renderTransparentObjects(); 
 		void clearGBuffers(); 
 		void clearIlluminationBuffers(); 
 		void showBuffers(); 
