@@ -29,16 +29,6 @@ namespace GTR {
 		DIRECTIONAL = 2
 	};
 
-	enum RenderPipeline {
-		Forward = 0,
-		Deferred = 1
-	};
-
-	enum RenderType {
-		Multipass = 0,
-		Singlepass = 1,
-	};
-
 	class Scene;
 	class Prefab;
 
@@ -105,33 +95,53 @@ namespace GTR {
 	class Scene
 	{
 	public:
+
+		enum RenderPipeline {
+			Forward = 0,
+			Deferred = 1
+		};
+
+		enum LightModel {
+			Phong = 0,
+			BRDF_Lambert = 1,
+			BRDF_Burley = 2
+		};
+
+		enum LightPass {
+			Multipass = 0,
+			Singlepass = 1,
+		};
+
+		//Singleton
 		static Scene* instance;
 
+		//Scene properties
 		Vector3 background_color;
 		Vector3 ambient_light;
 		Camera* main_camera;
 
-		//Scene shadows
-		Texture* shadow_atlas; //Shadow map of the lights of the scene
-
-		//Scene properties
+		//Scene algorithms
 		bool alpha_sorting; //Whether we sort render calls or not.
 		bool emissive_materials; //Whether we enable prefab's emissive texture or not.
 		bool occlusion; //Whether we enable prefab's occlusion texture or not.
 		bool specular_light; //Whether we enable prefab's roughness metallic texture or not.
 		bool normal_mapping; //Whether we are redering with normal map or interpolated normals.
-		int render_pipeline; //Whether we are rendering with forward or deferred pipeline. By deafult we set the flag to Deferred.
-		int render_type; //Whether we are rendering with Single Pass or Multi Pass. By deafult we set the flag to Single Pass.
+
+		//Render properties
+		RenderPipeline render_pipeline; //Whether we are rendering with forward or deferred pipeline. By deafult we set the flag to Deferred.
+		LightModel light_model; //The light equation we are using
+		LightPass light_pass; //Whether we are rendering with Single Pass or Multi Pass. By deafult we set the flag to Single Pass.
+
+		//Shadows
+		Texture* shadow_atlas; //Shadow map of the lights of the scene
+		int atlas_resolution_index; //The corresponding index in the array of shadow atlas resolutions
+		int atlas_scope; //The current shadow scope in case that all shadow maps doesn't fit into the screen.
+		bool show_atlas; //Enables or disables the display of the shadow atlas.
 		int num_shadows; //The number of shadows in the scene.
 
 		//Deferred buffers
 		bool show_buffers;
 		bool toggle_buffers;
-
-		//Shadow atlas
-		int atlas_resolution_index; //The corresponding index in the array of shadow atlas resolutions
-		int atlas_scope; //The current shadow scope in case that all shadow maps doesn't fit into the screen.
-		bool show_atlas; //Enables or disables the display of the shadow atlas.
 
 		//Scene triggers
 		bool resolution_trigger; //Triggers if a resolution 

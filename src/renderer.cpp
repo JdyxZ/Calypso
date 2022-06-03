@@ -83,10 +83,10 @@ void Renderer::renderScene()
 	//Choose a rendering pipeline
 	switch (scene->render_pipeline)
 	{
-	case(RenderPipeline::Forward):
+	case(Scene::Forward):
 		renderForward();
 		break;
-	case(RenderPipeline::Deferred):
+	case(Scene::Deferred):
 		renderDeferred();
 		break;
 	}
@@ -326,9 +326,9 @@ void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh, std::vector<Light
 		if (starting_light == 5)
 		{
 			glEnable(GL_BLEND);
-			if (scene->render_pipeline == Forward)
+			if (scene->render_pipeline == Scene::Forward)
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-			else if (scene->render_pipeline == Deferred)
+			else if (scene->render_pipeline == Scene::Deferred)
 				glBlendFunc(GL_ONE, GL_ONE);
 
 			shader->setUniform("u_ambient_light", Vector3());
@@ -438,9 +438,9 @@ void GTR::Renderer::MultiPassLoop(Shader* shader, Mesh* mesh, std::vector<LightE
 		if (i == 1)
 		{
 			glEnable(GL_BLEND);
-			if (scene->render_pipeline == Forward)
+			if (scene->render_pipeline == Scene::Forward)
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-			else if (scene->render_pipeline == Deferred)
+			else if (scene->render_pipeline == Scene::Deferred)
 				glBlendFunc(GL_ONE, GL_ONE);
 
 			shader->setUniform("u_ambient_light", Vector3());//reset the ambient light
@@ -540,7 +540,8 @@ void GTR::Renderer::renderForward()
 	shader->enable();
 
 	//Upload scene uniforms
-	shader->setUniform("u_render_type", scene->render_type);
+	shader->setUniform("u_light_model", scene->light_model);
+	shader->setUniform("u_light_pass", scene->light_pass);
 	shader->setUniform("u_ambient_light", scene->ambient_light);
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
@@ -634,11 +635,11 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 	assert(glGetError() == GL_NO_ERROR);
 
 	//Select render tpye
-	switch (scene->render_type) {
-	case(Singlepass):
+	switch (scene->light_pass) {
+	case(Scene::Singlepass):
 		SinglePassLoop(shader, rc->mesh, lights);
 		break;
-	case(Multipass):
+	case(Scene::Multipass):
 		MultiPassLoop(shader, rc->mesh, lights);
 		break;
 	}
@@ -893,12 +894,12 @@ void GTR::Renderer::clearIlluminationBuffers()
 //Render the deferred illumination
 void GTR::Renderer::renderDeferredIllumination()
 {
-	switch (scene->render_type)
+	switch (scene->light_pass)
 	{
-	case(Singlepass):
+	case(Scene::Singlepass):
 		renderQuadIllumination();
 		break;
-	case(Multipass):
+	case(Scene::Multipass):
 		renderSphereIllumination();
 		break;
 	}
@@ -926,7 +927,8 @@ void GTR::Renderer::renderQuadIllumination()
 	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
 
 	//Set scene uniforms in the shader
-	quad_shader->setUniform("u_render_type", scene->render_type);
+	quad_shader->setUniform("u_light_model", scene->light_model);
+	quad_shader->setUniform("u_light_pass", scene->light_pass);
 	quad_shader->setUniform("u_ambient_light", scene->ambient_light);
 	quad_shader->setUniform("u_emissive_materials", scene->emissive_materials);
 	quad_shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
@@ -1011,7 +1013,8 @@ void GTR::Renderer::renderSphereIllumination()
 	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
 
 	//Set scene uniforms in the shader
-	sphere_shader->setUniform("u_render_type", scene->render_type);
+	sphere_shader->setUniform("u_light_model", scene->light_model);
+	sphere_shader->setUniform("u_light_pass", scene->light_pass);
 	sphere_shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
 	sphere_shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
 	sphere_shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
@@ -1068,7 +1071,8 @@ void GTR::Renderer::renderSphereIllumination()
 	quad_shader->enable();
 
 	//Set scene uniforms in the shader
-	quad_shader->setUniform("u_render_type", scene->render_type);
+	quad_shader->setUniform("u_light_model", scene->light_model);
+	quad_shader->setUniform("u_light_pass", scene->light_pass);
 	quad_shader->setUniform("u_ambient_light", scene->ambient_light);
 	quad_shader->setUniform("u_emissive_materials", scene->emissive_materials);
 	quad_shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
@@ -1121,7 +1125,8 @@ void GTR::Renderer::renderTransparentObjects()
 	shader->enable();
 
 	//Upload scene uniforms
-	shader->setUniform("u_render_type", scene->render_type);
+	shader->setUniform("u_light_model", scene->light_model);
+	shader->setUniform("u_light_pass", scene->light_pass);
 	shader->setUniform("u_ambient_light", scene->ambient_light);
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);

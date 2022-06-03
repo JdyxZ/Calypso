@@ -32,9 +32,14 @@ LAB 2
 
 Deferred
 
-- Artefacto negro de mover la cámara.
-- Se puede utilizar Singlepass para pintar en esferas? 
-- Como añadimos la luz ambiente si solo renderizamos en esferas? ya que si quitamos la directional light nunca se añade.
-- Texture de hojas.
+- Artefacto negro de mover la cámara - Problema del shadow bias con deferred
+- Se puede utilizar Singlepass para pintar en esferas? - No
+- Como añadimos la luz ambiente si solo renderizamos en esferas? ya que si quitamos la directional light nunca se añade - Hay que hacer branching
+- Texture de hojas - Alpha Cutoff
 - glDepthFunc(GL_LEQUAL) todo el rato?
-- Cómo ver el árbol de errores en visual.
+- Cómo ver el árbol de errores en visual - Call Stack
+
+PBR
+
+- 
+

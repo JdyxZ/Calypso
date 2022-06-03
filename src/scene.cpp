@@ -16,27 +16,28 @@ GTR::Scene::Scene()
 	//Camera
 	main_camera = NULL;
 
-	//Shadow Atlas
-	shadow_atlas = NULL;
-
-	//Scene properties
+	//Scene algorithms
 	alpha_sorting = true;
 	emissive_materials = true;
 	occlusion = true;
 	specular_light = true;
 	normal_mapping = true;
-	render_pipeline = Deferred;
-	render_type = Singlepass;
+
+	//Render properties
+	render_pipeline = Scene::Deferred;
+	light_model = Scene::Phong;
+	light_pass = Scene::Singlepass;
+
+	//Shadows
+	shadow_atlas = NULL;
+	atlas_resolution_index = 2; //Set by default 2048 x 2048 resolution
+	atlas_scope = 0;
+	show_atlas = false;
 	num_shadows = 0;
 
 	//GBuffers debugging
 	show_buffers = false;
 	toggle_buffers = false;
-
-	//Shadow atlas debugging
-	atlas_resolution_index = 2; //Set by default 2048 x 2048 resolution
-	show_atlas = false;
-	atlas_scope = 0;
 
 	//Scene triggers: We set them true just for the first iteration
 	resolution_trigger = true;

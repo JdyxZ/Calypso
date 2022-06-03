@@ -46,7 +46,7 @@ public:
 
 	//Light creation
 	int current_light_type;
-	const char* light_types[3] = { "POINT","SPOT","DIRECTIONAL" };
+	const char* light_types[3] = { "POINT","SPOT","DIRECTIONAL" }; // Array of light types
 
 	//ImGui IO
 	ImGuiIO* io = &ImGui::GetIO();

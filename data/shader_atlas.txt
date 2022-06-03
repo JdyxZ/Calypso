@@ -45,7 +45,8 @@ vec3 perturbNormal(in vec3 N, in vec3 WP, in vec2 uv, in vec3 normal_pixel)
 
 \shadow_test
 
-float testShadowMap(in float shadow_index, in float num_shadows,in float shadows_bias, in vec3 world_position, in mat4 shadow_vp, in sampler2D shadow_atlas)
+float testShadowMap(const in float shadow_index, const in float shadows_bias, const in mat4 shadow_vp, const in float num_shadows, 
+	const in sampler2D shadow_atlas, const in vec3 world_position)
 {
 	//project our 3D position to the shadowmap
 	vec4 proj_pos = shadow_vp * vec4(world_position,1.0);
@@ -86,40 +87,30 @@ float testShadowMap(in float shadow_index, in float num_shadows,in float shadows
 
 \phong
 
-vec3 PhongEquation(in vec3 light_color, in vec3 light_vector, in float light_intensity, in float light_distance, in float light_max_distance, in bool light_attenuation, in bool specular_light, in vec3 normal_vector, in vec3 omr, in vec3 worldpos, in vec3 camera_position, in bool cast_shadows, in float shadow_index, in float num_shadows, in float shadow_bias, in mat4 shadow_vp, in sampler2D shadow_atlas)
+vec3 PhongEquation(const in vec3 light_color, const in vec3 light_vector, const in float light_intensity, const float light_attenuation, 
+	const in vec3 normal_vector, const in vec3 view_vector, const in float metalness, const in float roughness, const float shadow_factor, 
+	const in bool specular_light)
 {
+	//Use local variables
 	vec3 L = light_vector;
 	vec3 N = normal_vector;
+	vec3 V = view_vector;
+
+	//Compute R vector
 	vec3 R = reflect(-L, N);
-	vec3 V = camera_position - worldpos;
     R = normalize(R);
-    V = normalize(V);
 
     //Compute dot products
     float NdotL = clamp(dot(N,L), 0.0, 1.0);
     float RdotV = clamp(dot(R,V), 0.0, 1.0);
 
-    //Shadow factor
-	float shadow_factor = 1.0;
-	if(cast_shadows) shadow_factor = testShadowMap(shadow_index, num_shadows, shadow_bias, worldpos, shadow_vp, shadow_atlas);
-
-    //Compute attenuation factor
-    float attenuation_factor = 1.0;
-    if(light_attenuation)
-    {
-	    light_max_distance = max(light_max_distance,0.0);
-	    attenuation_factor =  light_max_distance - light_distance;
-		attenuation_factor /= light_max_distance;
-		attenuation_factor = pow(max( attenuation_factor, 0.0 ),2.0);
-    }
-
     //Compute shininess factor
-    float shininess_factor = omr.y * 20.0; //Multiply roughness by a float to reduce specular inaccuracy
+    float shininess_factor = metalness * 20.0; //Multiply metallness by a float to reduce specular inaccuracy
 
     //Compute light factors
-    float diffuse_factor = attenuation_factor * NdotL;
+    float diffuse_factor = light_attenuation * NdotL;
     float specular_factor = 0.0;
-    if(specular_light) specular_factor = attenuation_factor * omr.z * pow(RdotV, shininess_factor); 
+    if(specular_light) specular_factor = light_attenuation * roughness * pow(RdotV, shininess_factor); 
 
     //Phong equation
 	vec3 light = (diffuse_factor + specular_factor) * light_color * light_intensity * shadow_factor;
@@ -128,16 +119,158 @@ vec3 PhongEquation(in vec3 light_color, in vec3 light_vector, in float light_int
 	return light;
 }
 
+\PBR
+
+//PBR uniforms and constants
+#define RECIPROCAL_PI 0.3183098861837697
+#define PI 3.14159265358979323846
+
+// Walter GGX Normal Distribution
+float D_Walter_GGX (const in float NdotH, const in float linear_roughness )
+{
+	float a2 = linear_roughness * linear_roughness;
+	float f = (NdotH * NdotH) * (a2 - 1.0) + 1.0;
+	return a2 / (PI * f * f);
+}
+
+//Schlick Fresnel Function
+float F_Schlick( const in float VdotH, const in float f0)
+{
+	//Scalar fresnel
+	float f = pow(1.0 - VdotH, 5.0);
+	return f0 + (1.0 - f0) * f;
+}
+
+// Schlick Fresnel Function
+vec3 F_Schlick( const in float VdotH, const in vec3 f0)
+{
+	//Colorized fresnel
+	float f = pow(1.0 - VdotH, 5.0);
+	return f0 + (vec3(1.0) - f0) * f;
+}
+
+//Schlick Fresnel Function
+float F_Schlick(const float u, const float f0, const float f90) {
+    return f0 + (f90 - f0) * pow(1.0 - u, 5.0);
+}
+
+// Smith G1 Aproximation
+float G1(const in float vectors_dot, const in float k){
+	return vectors_dot / (vectors_dot * (1.0 - k) + k);
+}
+
+//Smith G2 Aproximation
+float G2(const in float NdotL, const in float NdotV, const in float k)
+{
+	float product = 2 * NdotL * NdotV;
+	return product / 2 * mix(product,NdotL + NdotV, k);
+}
+
+//Smith Geometric Shadowing
+float G_SmithGGXCorrelated(const in float NdotV, const in float NdotL, const in float roughness)
+{
+	float k = pow(roughness + 1.0, 2.0) / 8.0;
+	return G1(NdotL, k) * G1(NdotV, k);
+}
+
+//Cook-Torrance specular reflection model
+vec3 specularBRDF( const in float roughness, const in vec3 f0, const in float NdotH, const in float NdotV, const in float NdotL, const in float LdotH )
+{
+	//Alpha coefficient
+	float a = roughness * roughness;
+
+	// Normal Distribution Function
+	float D = D_Walter_GGX( NdotH, a );
+
+	// Fresnel Function
+	vec3 F = F_Schlick( LdotH, f0 );
+
+	// Visibility Function (shadowing/masking)
+	float G = G_SmithGGXCorrelated(NdotV, NdotL, roughness);
+			
+	//Compute specular reflection
+	vec3 specular_reflection = D * G * F;
+
+	//Normalize specular reflection
+	specular_reflection /= (4.0 * NdotL * NdotV + 1e-6);
+
+	//Cook-Torrance specular
+	return specular_reflection;
+}
+
+//Burley Diffuse Reflections
+float BurleyBRDF ( const in float NdotV, const in float NdotL, const in float LdotH, const in float alpha)
+{
+    float f90 = 0.5 + 2.0 * alpha * LdotH * LdotH;
+    float light_scatter = F_Schlick(NdotL, 1.0, f90);
+    float view_scatter  = F_Schlick(NdotV, 1.0, f90);
+    return light_scatter * view_scatter * RECIPROCAL_PI;
+}
+
+//Phong Diffuse Reflections
+float LambertBRDF() {
+    return 1.0 / PI;
+}
+
+vec3 BRDF(const in vec3 L, const in vec3 V, const in vec3 N, const in vec3 albedo, const in float metalness, const in float linear_roughness, 
+	const in vec3 light_color, const in float light_intensity, const in float light_attenuation, const in float shadow_factor, const in bool specular_light, const in int light_model)
+{
+	//Compute half vector
+	vec3 H = (L + V) / length(L + V);
+
+	//Compute dot products
+	float NdotH = clamp(dot(N,H), 0.0, 1.0);
+	float NdotV = clamp(dot(N,V), 0.0, 1.0);
+	float NdotL = clamp(dot(N,L), 0.0, 1.0);
+	float LdotH = clamp(dot(L,H), 0.0, 1.0);
+
+	//We compute the reflection in base to the color and the metalness
+	vec3 f0 = mix( vec3(0.5), albedo, metalness );
+
+	//Metallic materials do not have diffuse
+	vec3 diffuse_color = (1.0 - metalness) * albedo;
+
+	//Compute the specular
+	vec3 specular;
+	if(specular_light) specular = specularBRDF( linear_roughness, f0, NdotH, NdotV, NdotL, LdotH);
+
+	//Compute the diffuse
+	vec3 diffuse;
+	if(light_model == 1) //Lambertian reflectance
+	{
+		diffuse = diffuse_color * LambertBRDF(); 
+	}
+	else if(light_model == 2)//Burley diffuse
+	{
+		diffuse = diffuse_color * BurleyBRDF(NdotV,NdotL,LdotH,linear_roughness * linear_roughness); 
+	}
+
+	//Add diffuse and specular reflection
+	vec3 direct_light = specular + diffuse;
+
+	//Compute how much light received the pixel
+	vec3 light_factor = light_color * light_intensity * light_attenuation * shadow_factor;
+
+	//Modulate direct light by light received
+	vec3 light = direct_light * light_factor;
+
+	//Return light computation
+	return light;	
+}
+
+
 \lighting
 
 //Scene uniforms
 uniform vec3 u_camera_position;
+uniform int u_light_model;
 uniform vec3 u_ambient_light;
 uniform bool u_specular_light;
 uniform bool u_occlusion;
 uniform bool u_shadows;
 uniform int u_num_lights;
 uniform float u_num_shadows;
+uniform sampler2D u_shadow_atlas;
 
 //Single pass maximum number of lights to render
 const int MAX_LIGHTS = 5;
@@ -182,15 +315,24 @@ uniform float u_shadow_index;
 uniform float u_shadow_bias;
 uniform mat4 u_shadow_vp;
 
+float computeLightAttenuation(in float light_distance, in float light_max_distance)
+{
+    //Light Attenuation
+    light_max_distance = max(light_max_distance,0.0);
+    float attenuation_factor =  light_max_distance - light_distance;
+	attenuation_factor /= light_max_distance;
+	attenuation_factor = pow(max( attenuation_factor, 0.0 ),2.0);
+	return attenuation_factor;
+}
 
-vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
+vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in vec3 omr)
 {
 	//Compute ambient factor
 	float ambient_factor = 1.0;
 	if(u_occlusion) ambient_factor = omr.x;
 
 	//Set ambient light to phong light
-	vec3 phong_light = ambient_factor * u_ambient_light;
+	vec3 light = ambient_factor * u_ambient_light;
 
 	//Single pass for loop
 	for( int i = 0; i < MAX_LIGHTS; ++i )
@@ -200,6 +342,10 @@ vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
 			//Light intensisty
 			float light_intensity = u_lights_intensity[i];
 
+			//Compute shadow factor 
+			float shadow_factor = 1.0;
+			if(u_cast_shadows[i]) shadow_factor = testShadowMap(u_shadows_index[i], u_shadows_bias[i], u_shadows_vp[i], u_num_shadows, u_shadow_atlas, world_position);
+
 			if(u_lights_type[i] == 0) //point light
 			{
 				//Light vector
@@ -208,20 +354,33 @@ vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
 				//Light distance
 				float light_distance = length(light_vector);
 
+				//Light attenuation
+				float light_attenuation = computeLightAttenuation(light_distance,u_lights_max_distance[i]);
+
 				//Normalize light vector
 				light_vector /= light_distance;
 
-				//Phong Equation
-				phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+				//Light Model
+				if(u_light_model == 0) //Lambert aproximation
+				{
+					light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_attenuation, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
+				}
+				else if(u_light_model > 0) //PBR model
+				{
+					light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_lights_color[i], light_intensity, light_attenuation, shadow_factor, u_specular_light, u_light_model);
+				}
 
 			}
-			else if(u_lights_type[i] == 1)//spot light
+			else if(u_lights_type[i] == 1) //spotlight
 			{
 				//Light vector
 				vec3 light_vector = u_lights_position[i] - world_position;
 
 				//Light distance
 				float light_distance = length(light_vector);
+
+				//Light attenuation
+				float light_attenuation = computeLightAttenuation(light_distance,u_lights_max_distance[i]);
 
 				//Normalize light vector
 				light_vector /= light_distance;
@@ -238,8 +397,15 @@ vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
 					//Light intesity
 					light_intensity *= pow(spot_cosine,max(u_spots_cone[i].x,0.0));
 
-					//Phong Equation
-					phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);
+					//Light Model
+					if(u_light_model == 0) //Lambert aproximation
+					{
+						light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_attenuation, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
+					}
+					else if(u_light_model > 0) //PBR model
+					{
+						light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_lights_color[i], light_intensity, light_attenuation, shadow_factor, u_specular_light, u_light_model);
+					}
 				}
 
 			}
@@ -254,26 +420,37 @@ vec3 Singlepass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
 				//Normalize light vector
 				light_vector /= light_distance;
 
-				//Phong Equation
-				phong_light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_distance, u_lights_max_distance[i], false, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadows[i], u_shadows_index[i], u_num_shadows, u_shadows_bias[i], u_shadows_vp[i], u_shadow_atlas);			
+					//Light Model
+					if(u_light_model == 0) //Lambert aproximation
+					{
+						light += PhongEquation(u_lights_color[i], light_vector, light_intensity, 1.0, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
+					}
+					else if(u_light_model > 0) //PBR model
+					{
+						light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_lights_color[i], light_intensity, 1.0, shadow_factor, u_specular_light, u_light_model);
+					}
 			}			
 		}
 	}
 
-	return phong_light;
+	return light;
 }
 
-vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
+vec3 Multipass(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in vec3 omr)
 {
 	//Compute ambient factor
 	float ambient_factor = 1.0;
 	if(u_occlusion) ambient_factor = omr.x;
 
 	//Set ambient light to phong light
-	vec3 phong_light = ambient_factor * u_ambient_light;
+	vec3 light = ambient_factor * u_ambient_light;
 
 	//Light intesity
 	float light_intensity = u_light_intensity;
+
+	//Compute shadow factor 
+	float shadow_factor = 1.0;
+	if(u_cast_shadow) shadow_factor = testShadowMap(u_shadow_index, u_shadow_bias, u_shadow_vp, u_num_shadows, u_shadow_atlas, world_position);
 
 	if(u_light_type == 0) //point light
 	{
@@ -283,20 +460,33 @@ vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
 		//Light distance
 		float light_distance = length(light_vector);
 
+		//Light attenuation
+		float light_attenuation = computeLightAttenuation(light_distance,u_light_max_distance);
+
 		//Normalize light vector
 		light_vector /= light_distance;
 
-		//Phong Equation
-		phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
+		//Light Model
+		if(u_light_model == 0) //Lambert aproximation
+		{
+			light += PhongEquation(u_light_color, light_vector, light_intensity, light_attenuation, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
+		}
+		else if(u_light_model > 0) //PBR model
+		{
+			light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_light_color, light_intensity, light_attenuation, shadow_factor, u_specular_light, u_light_model);
+		}
 
 	}
-	else if(u_light_type == 1)//spot light
+	else if(u_light_type == 1) //spotlight
 	{
 		//Light vector
 		vec3 light_vector = u_light_position - world_position;
 
 		//Light distance
 		float light_distance = length(light_vector);
+
+		//Light attenuation
+		float light_attenuation = computeLightAttenuation(light_distance,u_light_max_distance);
 
 		//Normalize light vector
 		light_vector /= light_distance;
@@ -313,9 +503,16 @@ vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
 			//Light intesity
 			light_intensity *= pow(spot_cosine,max(u_spot_cone.x,0.0));
 
-			//Phong Equation
-			phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, true, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
-		} 
+			//Light Model
+			if(u_light_model == 0) //Lambert aproximation
+			{
+				light += PhongEquation(u_light_color, light_vector, light_intensity, light_attenuation, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
+			}
+			else if(u_light_model > 0) //PBR model
+			{
+				light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_light_color, light_intensity, light_attenuation, shadow_factor, u_specular_light, u_light_model);
+			} 
+		}
 	}
 	else if(u_light_type == 2) //directional light
 	{
@@ -328,11 +525,18 @@ vec3 Multipass(in vec3 normal_vector, in vec3 omr, in vec3 world_position)
 		//Normalize light vector
 		light_vector /= light_distance;
 
-		//Phong Equation
-		phong_light += PhongEquation(u_light_color, light_vector, light_intensity, light_distance, u_light_max_distance, false, u_specular_light, normal_vector, omr, world_position, u_camera_position, u_cast_shadow, u_shadow_index, u_num_shadows, u_shadow_bias, u_shadow_vp, u_shadow_atlas);
-	}	
+		//Light Model
+		if(u_light_model == 0) //Lambert aproximation
+		{
+			light += PhongEquation(u_light_color, light_vector, light_intensity, 1.0, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
+		}
+		else if(u_light_model > 0) //PBR model
+		{
+			light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_light_color, light_intensity, 1.0, shadow_factor, u_specular_light, u_light_model);
+		}
+	}
 
-	return phong_light;
+	return light;
 }
 
 \pixel.vs
@@ -430,10 +634,9 @@ uniform sampler2D u_color_texture;
 uniform sampler2D u_normal_texture;
 uniform sampler2D u_omr_texture;
 uniform sampler2D u_emissive_texture;
-uniform sampler2D u_shadow_atlas;
 
 //Scene uniforms
-uniform int u_render_type;
+uniform int u_light_pass;
 uniform float u_time;
 uniform bool u_last_iteration;
 
@@ -450,6 +653,7 @@ out vec4 FragColor;
 #include normal_mapping
 #include shadow_test
 #include phong
+#include PBR
 #include lighting
 
 void main()
@@ -474,10 +678,19 @@ void main()
 	if(u_normal_mapping) normal_vector = perturbNormal(interpolated_normal, v_world_position, v_uv, tangent_space_normal);//Normal map
 	else normal_vector = interpolated_normal;//Interpolated Normal
 
-	//Compute phong
+	//View vector
+	vec3 view_vector = normalize(u_camera_position - v_world_position);
+
+	//Compute light
 	vec3 light;
-	if(u_render_type == 0) light = Multipass(normal_vector, omr, v_world_position);
-	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, v_world_position);
+	if(u_light_pass == 0) //Multi pass lighting
+	{
+		light = Multipass(normal_vector, view_vector, v_world_position, color.xyz, omr);
+	} 
+	else if(u_light_pass == 1) //Single pass lighting
+	{
+		light = Singlepass(normal_vector, view_vector, v_world_position, color.xyz, omr);
+	} 
 	
 	//Final color
 	color.rgb *= light;
@@ -517,10 +730,9 @@ uniform sampler2D u_gb0_texture;
 uniform sampler2D u_gb1_texture;
 uniform sampler2D u_gb2_texture;
 uniform sampler2D u_depth_texture;
-uniform sampler2D u_shadow_atlas;
 
 //Scene uniforms
-uniform int u_render_type;
+uniform int u_light_pass;
 uniform bool u_emissive_materials;
 uniform mat4 u_inverse_viewprojection;
 uniform vec2 u_iRes;
@@ -535,6 +747,7 @@ layout(location = 1) out vec3 I1;
 #include normal_mapping
 #include shadow_test
 #include phong
+#include PBR
 #include lighting
 
 void main()
@@ -565,10 +778,19 @@ void main()
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
 	vec3 world_position = proj_worldpos.xyz / proj_worldpos.w;
 
-	//Compute phong
+	//View vector
+	vec3 view_vector = normalize(u_camera_position - world_position);
+
+	//Compute light
 	vec3 light;
-	if(u_render_type == 0) light = Multipass(normal_vector, omr, world_position);
-	else if(u_render_type == 1) light = Singlepass(normal_vector, omr, world_position);
+	if(u_light_pass == 0) //Multi pass lighting
+	{
+		light = Multipass(normal_vector, view_vector, world_position, color.xyz, omr);
+	} 
+	else if(u_light_pass == 1) //Single pass lighting
+	{
+		light = Singlepass(normal_vector, view_vector, world_position, color.xyz, omr);
+	} 
 
 	//Final color
 	color *= light;
@@ -628,6 +850,10 @@ void main()
 	vec3 tangent_space_normal = texture2D( u_normal_texture, v_uv ).xyz; 
 	vec3 omr = texture2D(u_omr_texture,v_uv).xyz;
 	vec3 emissive_light = u_emissive_factor * texture2D(u_emissive_texture,v_uv).xyz;
+
+	//Mask
+	if(color.a < u_alpha_cutoff)
+		discard;
 
 	//Interpolated normal
 	vec3 interpolated_normal = normalize(v_normal);

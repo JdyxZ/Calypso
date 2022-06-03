@@ -283,33 +283,46 @@ void Application::renderDebugGUI(void)
 	ImGui::Checkbox("Grid", &render_grid);
 	ImGui::Checkbox("Alpha sorting", &scene->alpha_sorting);
 	ImGui::Checkbox("Emissive materials", &scene->emissive_materials);
-	if (!renderer->lights.empty()) ImGui::Checkbox("Occlussion texture", &scene->occlusion);
-	if (!renderer->lights.empty()) ImGui::Checkbox("Specular light", &scene->specular_light);
-	if (!renderer->lights.empty()) ImGui::Checkbox("Normal map", &scene->normal_mapping);
-	if (!renderer->lights.empty()) ImGui::Checkbox("Shadow Atlas", &scene->show_atlas);
-
-	if(!renderer->lights.empty() && scene->render_pipeline == GTR::RenderPipeline::Deferred)
-		ImGui::Checkbox("GBuffers", &scene->show_buffers);
-
-	//Shadow resolution
-	if (!renderer->lights.empty()) scene->shadow_resolution_trigger = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, shadow_resolutions, IM_ARRAYSIZE(shadow_resolutions));
-
-	//Render pipeline
-	if (!renderer->lights.empty()) ImGui::Combo("Render Pipelne", (int*)&scene->render_pipeline, "Forward\0Deferred", 2);
-
-	//Render type
 	if (!renderer->lights.empty())
 	{
-		switch (scene->render_type)
+		//Textures
+		ImGui::Checkbox("Occlussion texture", &scene->occlusion);
+		ImGui::Checkbox("Specular light", &scene->specular_light);
+		ImGui::Checkbox("Normal map", &scene->normal_mapping);
+
+		//GBuffers
+		if(scene->render_pipeline == GTR::Scene::Deferred)
+			ImGui::Checkbox("GBuffers", &scene->show_buffers);
+
+		//Shadow atlas
+		ImGui::Checkbox("Shadow Atlas", &scene->show_atlas);
+
+		//Shadow resolution
+		scene->shadow_resolution_trigger = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, shadow_resolutions, IM_ARRAYSIZE(shadow_resolutions));
+
+		//Render pipeline
+		ImGui::Combo("Render Pipeline", (int*)&scene->render_pipeline, "Forward\0Deferred", 2);
+
+		//Light model
+		ImGui::Combo("Light Model", (int*)&scene->light_model, "Phong\0BRDF + Lambert diffuse\0BRDF + Burley diffuse");
+
+		//Render type
+		switch (scene->light_pass)
 		{
-		case(GTR::Singlepass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Multipass, GTR::Singlepass, "SinglePass"); break;
-		case(GTR::Multipass): ImGui::SliderInt("Render Type", &scene->render_type, GTR::Multipass, GTR::Singlepass, "Multipass"); break;
+			case(GTR::Scene::Singlepass): 
+				ImGui::SliderInt("Render Type", (int*)&scene->light_pass, GTR::Scene::Multipass, GTR::Scene::Singlepass, "SinglePass");
+				break;
+			case(GTR::Scene::Multipass):
+				ImGui::SliderInt("Render Type", (int*)&scene->light_pass, GTR::Scene::Multipass, GTR::Scene::Singlepass, "Multipass");
+				break;
 		}
+
+		//Ambient color
+		ImGui::ColorEdit3("Ambient Light", scene->ambient_light.v);
 	}
 
-	//Scene Color
+	//Background Color
 	ImGui::ColorEdit3("Background color", scene->background_color.v);
-	if (!renderer->lights.empty()) ImGui::ColorEdit3("Ambient Light", scene->ambient_light.v);
 
 	//add info to the debug panel about the camera
 	if (ImGui::TreeNode(camera, "Camera")) {
