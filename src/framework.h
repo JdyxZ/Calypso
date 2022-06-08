@@ -110,11 +110,11 @@ public:
 
 	float distance(const Vector3& v) const;
 	
-
 	Vector3 cross( const Vector3& v ) const;
 	float dot( const Vector3& v ) const;
 
 	void parseFromText(const char* text, const char separator);
+	void print();
 
 	float& operator [] (int n) { return v[n]; }
 	void operator += (const Vector3& v) { x += v.x; y += v.y; z += v.z; }
@@ -222,7 +222,7 @@ class Matrix44
 		void setIdentity();
 		void transpose();
 		void normalizeAxis();
-		void printMatrix();
+		void print();
 
 		//get base vectors
 		Vector3 rightVector() { return Vector3(m[0],m[1],m[2]); }

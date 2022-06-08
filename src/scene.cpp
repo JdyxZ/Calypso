@@ -22,10 +22,13 @@ GTR::Scene::Scene()
 	occlusion = true;
 	specular_light = true;
 	normal_mapping = true;
+	gamma_correction = true;
 
 	//Render properties
 	render_pipeline = Scene::Deferred;
 	light_model = Scene::Phong;
+	diffuse_reflection = Scene::Lambert;
+	smith_aproximation = Scene::G1; 
 	light_pass = Scene::Singlepass;
 
 	//Shadows
@@ -39,13 +42,14 @@ GTR::Scene::Scene()
 	show_buffers = false;
 	toggle_buffers = false;
 
-	//Scene triggers: We set them true just for the first iteration
+	//Scene triggers: We set some of them true just for the first iteration
 	resolution_trigger = true;
 	entity_trigger = true;
 	prefab_trigger = true;
 	light_trigger = true;
 	shadow_visibility_trigger = true;
 	shadow_resolution_trigger = true;
+	light_model_trigger = false;
 	
 }
 
@@ -274,6 +278,49 @@ void GTR::Scene::resetTriggers()
 	this->light_trigger = false;
 	this->shadow_visibility_trigger = false;
 	this->main_camera->camera_trigger = false;
+}
+
+void GTR::Scene::SwitchLightModel()
+{
+	float intensity_factor = 5.f;
+
+	switch (this->light_model)
+	{
+	case(BRDF):
+		for (auto it = this->entities.begin(); it != this->entities.end(); ++it)
+		{
+			//Current entity
+			BaseEntity* ent = *it;
+
+			//Check if it is a light
+			if (ent->entity_type == LIGHT)
+			{
+				//Current light
+				LightEntity* light = (LightEntity*)ent;
+
+				//Update light intensity
+				light->intensity *= intensity_factor;
+			}
+		}
+		break;
+	case(Phong):
+		for (auto it = this->entities.begin(); it != this->entities.end(); ++it)
+		{
+			//Current entity
+			BaseEntity* ent = *it;
+			
+			//Check if it is a light
+			if (ent->entity_type == LIGHT)
+			{
+				//Current light
+				LightEntity* light = (LightEntity*)ent;
+
+				//Update light intensity
+				light->intensity /= intensity_factor;
+			}
+		}
+		break;
+	}
 }
 
 void GTR::BaseEntity::renderInMenu()

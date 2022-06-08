@@ -194,6 +194,7 @@ void Application::update(double seconds_elapsed)
 		}
 	}
 
+	if (scene->light_model_trigger) scene->SwitchLightModel();
 }
 
 void Application::renderDebugGizmo()
@@ -283,6 +284,8 @@ void Application::renderDebugGUI(void)
 	ImGui::Checkbox("Grid", &render_grid);
 	ImGui::Checkbox("Alpha sorting", &scene->alpha_sorting);
 	ImGui::Checkbox("Emissive materials", &scene->emissive_materials);
+	ImGui::Checkbox("Gamma correction", &scene->gamma_correction);
+
 	if (!renderer->lights.empty())
 	{
 		//Textures
@@ -304,7 +307,14 @@ void Application::renderDebugGUI(void)
 		ImGui::Combo("Render Pipeline", (int*)&scene->render_pipeline, "Forward\0Deferred", 2);
 
 		//Light model
-		ImGui::Combo("Light Model", (int*)&scene->light_model, "Phong\0BRDF + Lambert diffuse\0BRDF + Burley diffuse");
+		scene->light_model_trigger = ImGui::Combo("Light Model", (int*)&scene->light_model, "Phong\0BRDF", 2);
+
+		//BRDF properties
+		if (scene->light_model == GTR::Scene::BRDF)
+		{
+			ImGui::Combo("Diffuse Reflections", (int*)&scene->diffuse_reflection, "Lambert\0Burley", 2);
+			ImGui::Combo("Smith GGX Aproximation", (int*)&scene->smith_aproximation, "G1\0G2", 2);
+		}
 
 		//Render type
 		switch (scene->light_pass)

@@ -347,7 +347,8 @@ void GTR::Renderer::SinglePassLoop(Shader* shader, Mesh* mesh, std::vector<Light
 
 			//General light properties
 			lights_position[j] = light->model.getTranslation();
-			lights_color[j] = light->color;
+			if (scene->gamma_correction) lights_color[j] = degamma(light->color); //Send light color in linear space
+			else lights_color[j] = light->color; //Send light color in gamma space
 			lights_intensity[j] = light->intensity;
 			lights_max_distance[j] = light->max_distance;
 
@@ -463,7 +464,8 @@ void GTR::Renderer::MultiPassLoop(Shader* shader, Mesh* mesh, std::vector<LightE
 
 		//Light uniforms
 		shader->setUniform("u_light_position", light->model.getTranslation());
-		shader->setUniform("u_light_color", light->color);
+		if(scene->gamma_correction)	shader->setUniform("u_light_color", degamma(light->color)); //Send light color in linear space
+		else shader->setUniform("u_light_color", light->color); //Send light color in gamma space
 		shader->setUniform("u_light_intensity", light->intensity);
 		shader->setUniform("u_light_max_distance", light->max_distance);
 
@@ -540,22 +542,16 @@ void GTR::Renderer::renderForward()
 	shader->enable();
 
 	//Upload scene uniforms
-	shader->setUniform("u_light_model", scene->light_model);
-	shader->setUniform("u_light_pass", scene->light_pass);
-	shader->setUniform("u_ambient_light", scene->ambient_light);
-	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
-	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_time", getTime());
-	shader->setUniform("u_occlusion", scene->occlusion);
-	shader->setUniform("u_specular_light", scene->specular_light);
-	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
-	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	setForwardSceneUniforms(shader);
 
 	//Send render calls to the GPU
 	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
 	{
 		//Current render call
 		RenderCall* rc = *it;
+
+		//Set ambient light
+		shader->setUniform("u_ambient_light", scene->ambient_light);
 
 		//If bounding box is inside the camera frustum then the prefab is probably visible
 		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
@@ -566,6 +562,24 @@ void GTR::Renderer::renderForward()
 
 	//Disable the shader
 	shader->disable();
+}
+
+//Upload foward scene uniforms to the shader
+void GTR::Renderer::setForwardSceneUniforms(Shader* shader)
+{
+	//Scene uniforms
+	shader->setUniform("u_light_model", scene->light_model);
+	shader->setUniform("u_diffuse_reflection", scene->diffuse_reflection);
+	shader->setUniform("u_geometry_shadowing", scene->smith_aproximation);
+	shader->setUniform("u_light_pass", scene->light_pass);
+	shader->setUniform("u_gamma_correction", scene->gamma_correction);
+	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	shader->setUniform("u_camera_position", camera->eye);
+	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_occlusion", scene->occlusion);
+	shader->setUniform("u_specular_light", scene->specular_light);
+	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
 }
 
 //Render a mesh with its materials and lights
@@ -668,6 +682,39 @@ void GTR::Renderer::renderDeferred()
 		illumination_fbo->color_textures[0]->toViewport();
 	}
 	
+}
+
+//Upload Deferred scene uniforms to the shader
+void GTR::Renderer::setDeferredSceneUniforms(Shader* shader)
+{
+	//Scene support variables
+	Vector2 i_Res = Vector2(1.0 / window_size.x, 1.0 / window_size.y);
+	Matrix44 inv_camera_vp = camera->viewprojection_matrix;
+	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
+
+	//Scene uniforms
+	shader->setUniform("u_light_model", scene->light_model);
+	shader->setUniform("u_diffuse_reflection", scene->diffuse_reflection);
+	shader->setUniform("u_geometry_shadowing", scene->smith_aproximation);
+	shader->setUniform("u_light_pass", scene->light_pass);
+	shader->setUniform("u_gamma_correction", scene->gamma_correction);
+	shader->setUniform("u_ambient_light", scene->ambient_light);
+	shader->setUniform("u_emissive_materials", scene->emissive_materials);
+	shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
+	shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
+	shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
+	shader->setUniform("u_camera_position", camera->eye);
+	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_occlusion", scene->occlusion);
+	shader->setUniform("u_specular_light", scene->specular_light);
+	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+
+	//Upload textures
+	shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
+	shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
+	shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
+	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
 }
 
 //GBuffers
@@ -921,31 +968,8 @@ void GTR::Renderer::renderQuadIllumination()
 	//Enable the shader
 	quad_shader->enable();
 
-	//Scene support variables
-	Vector2 i_Res = Vector2(1.0 / window_size.x, 1.0 / window_size.y);
-	Matrix44 inv_camera_vp = camera->viewprojection_matrix;
-	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
-
-	//Set scene uniforms in the shader
-	quad_shader->setUniform("u_light_model", scene->light_model);
-	quad_shader->setUniform("u_light_pass", scene->light_pass);
-	quad_shader->setUniform("u_ambient_light", scene->ambient_light);
-	quad_shader->setUniform("u_emissive_materials", scene->emissive_materials);
-	quad_shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
-	quad_shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
-	quad_shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
-	quad_shader->setUniform("u_camera_position", camera->eye);
-	quad_shader->setUniform("u_time", getTime());
-	quad_shader->setUniform("u_occlusion", scene->occlusion);
-	quad_shader->setUniform("u_specular_light", scene->specular_light);
-	quad_shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
-	quad_shader->setUniform("u_num_shadows", (float)scene->num_shadows);
-
-	//Upload textures
-	quad_shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
-	quad_shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
-	quad_shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
-	quad_shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+	//Scene uniforms
+	setDeferredSceneUniforms(quad_shader);
 
 	//Disable blending for the first iteration
 	glDisable(GL_BLEND);
@@ -1007,33 +1031,12 @@ void GTR::Renderer::renderSphereIllumination()
 	//Enable the shader
 	sphere_shader->enable();
 
-	//Scene support variables
-	Vector2 i_Res = Vector2(1.0 / window_size.x, 1.0 / window_size.y);
-	Matrix44 inv_camera_vp = camera->viewprojection_matrix;
-	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
-
-	//Set scene uniforms in the shader
-	sphere_shader->setUniform("u_light_model", scene->light_model);
-	sphere_shader->setUniform("u_light_pass", scene->light_pass);
-	sphere_shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
-	sphere_shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
-	sphere_shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
-	sphere_shader->setUniform("u_camera_position", camera->eye);
-	sphere_shader->setUniform("u_time", getTime());
-	sphere_shader->setUniform("u_occlusion", scene->occlusion);
-	sphere_shader->setUniform("u_specular_light", scene->specular_light);
-	sphere_shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
-	sphere_shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	//Scene uniforms
+	setDeferredSceneUniforms(sphere_shader);
 
 	//Don't add the emissive lights and the ambient light now
 	sphere_shader->setUniform("u_ambient_light", Vector3());
 	sphere_shader->setUniform("u_emissive_materials", 0);
-
-	//Upload textures
-	sphere_shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
-	sphere_shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
-	sphere_shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
-	sphere_shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
 
 	//Disable blending for the first iteration
 	glDisable(GL_BLEND);
@@ -1070,26 +1073,8 @@ void GTR::Renderer::renderSphereIllumination()
 	//Enable the shader
 	quad_shader->enable();
 
-	//Set scene uniforms in the shader
-	quad_shader->setUniform("u_light_model", scene->light_model);
-	quad_shader->setUniform("u_light_pass", scene->light_pass);
-	quad_shader->setUniform("u_ambient_light", scene->ambient_light);
-	quad_shader->setUniform("u_emissive_materials", scene->emissive_materials);
-	quad_shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
-	quad_shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
-	quad_shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
-	quad_shader->setUniform("u_camera_position", camera->eye);
-	quad_shader->setUniform("u_time", getTime());
-	quad_shader->setUniform("u_occlusion", scene->occlusion);
-	quad_shader->setUniform("u_specular_light", scene->specular_light);
-	quad_shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
-	quad_shader->setUniform("u_num_shadows", (float)scene->num_shadows);
-
-	//Upload textures
-	quad_shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
-	quad_shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
-	quad_shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
-	quad_shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+	//Scene uniforms
+	setDeferredSceneUniforms(quad_shader);
 
 	//Enable blending
 	glEnable(GL_BLEND);
@@ -1125,16 +1110,7 @@ void GTR::Renderer::renderTransparentObjects()
 	shader->enable();
 
 	//Upload scene uniforms
-	shader->setUniform("u_light_model", scene->light_model);
-	shader->setUniform("u_light_pass", scene->light_pass);
-	shader->setUniform("u_ambient_light", scene->ambient_light);
-	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
-	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_time", getTime());
-	shader->setUniform("u_occlusion", scene->occlusion);
-	shader->setUniform("u_specular_light", scene->specular_light);
-	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
-	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	setForwardSceneUniforms(shader);
 
 	//Enable depth test
 	glEnable(GL_DEPTH_TEST);
@@ -1251,6 +1227,21 @@ void GTR::Renderer::viewportEmissive()
 
 	//Disable the shader
 	shader->disable();
+}
+
+// <--------------------------------------------------- Gamma correction --------------------------------------------------->
+
+//Convert from gamma space to linear space
+Vector3 GTR::Renderer::degamma(Vector3 color)
+{
+	return Vector3(pow(color.x, 2.2), pow(color.y, 2.2), pow(color.z, 2.2));
+}
+
+//Convert from linear space to gamma space
+Vector3 GTR::Renderer::gamma(Vector3 color)
+{
+	float gamma_factor = 1.0 / 2.2;
+	return Vector3(pow(color.x, gamma_factor), pow(color.y, gamma_factor), pow(color.z, gamma_factor));
 }
 
 // <--------------------------------------------------- Shadows --------------------------------------------------->

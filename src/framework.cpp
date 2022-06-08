@@ -169,7 +169,15 @@ void Vector3::parseFromText(const char* text, const char separator)
 
 		++current;
 	}
-};
+}
+void Vector3::print()
+{
+	cout << "Vector components" << endl << endl;
+	cout << this->x << endl;
+	cout << this->y << endl;
+	cout << this->z << endl << endl;;
+}
+;
 
 float dot(const Vector3& a, const Vector3& b)
 {
@@ -233,7 +241,7 @@ void Matrix44::transpose()
    std::swap(m[6],m[9]); std::swap(m[7],m[13]); std::swap(m[11],m[14]);
 }
 
-void Matrix44::printMatrix()
+void Matrix44::print()
 {
 	cout << endl << "Printing Matrix..." << endl << endl;
 	cout << M[0][0] << "\t\t" << M[0][1] << "\t\t" << M[0][2] << "\t\t" << M[0][3] << endl;

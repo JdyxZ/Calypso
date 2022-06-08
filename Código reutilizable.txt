@@ -102,3 +102,20 @@ shadow_uv.x = (shadow_uv.x + u_shadow_index)/u_num_shadows;
 	cout << "Prior shadow atlas scope: " << scene->shadow_atlas_scope << endl;
 	scene->shadow_atlas_scope = shadow_scope;
 	cout << "After shadow atlas scope: " << scene->shadow_atlas_scope << endl;
+
+	for (auto it = scene->entities.begin(); it != scene->entities.end(); ++it)
+	{
+		//Current entity
+		GTR::BaseEntity* ent = *it;
+
+		//Check if it is a light
+		if (ent->entity_type == GTR::LIGHT)
+		{
+			//Current light
+			GTR::LightEntity* light = (GTR::LightEntity*)ent;
+
+			//Update light intensity
+			if(light->light_type != GTR::DIRECTIONAL)
+				light->intensity -= 3.0;
+		}
+	}

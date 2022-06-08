@@ -87,15 +87,10 @@ float testShadowMap(const in float shadow_index, const in float shadows_bias, co
 
 \phong
 
-vec3 PhongEquation(const in vec3 light_color, const in vec3 light_vector, const in float light_intensity, const float light_attenuation, 
-	const in vec3 normal_vector, const in vec3 view_vector, const in float metalness, const in float roughness, const float shadow_factor, 
+vec3 PhongEquation(const in vec3 light_color, const in vec3 L, const in float light_intensity, const float light_attenuation, 
+	const in vec3 N, const in vec3 V, const in float metalness, const in float roughness, const float shadow_factor, 
 	const in bool specular_light)
 {
-	//Use local variables
-	vec3 L = light_vector;
-	vec3 N = normal_vector;
-	vec3 V = view_vector;
-
 	//Compute R vector
 	vec3 R = reflect(-L, N);
     R = normalize(R);
@@ -124,13 +119,15 @@ vec3 PhongEquation(const in vec3 light_color, const in vec3 light_vector, const 
 //PBR uniforms and constants
 #define RECIPROCAL_PI 0.3183098861837697
 #define PI 3.14159265358979323846
+uniform int u_diffuse_reflection;
+uniform int u_geometry_shadowing;
 
 // Walter GGX Normal Distribution
 float D_Walter_GGX (const in float NdotH, const in float linear_roughness )
 {
-	float a2 = linear_roughness * linear_roughness;
-	float f = (NdotH * NdotH) * (a2 - 1.0) + 1.0;
-	return a2 / (PI * f * f);
+	float a = linear_roughness * linear_roughness;
+	float f = (NdotH * NdotH) * (a - 1.0) + 1.0;
+	return a / (PI * f * f);
 }
 
 //Schlick Fresnel Function
@@ -170,7 +167,16 @@ float G2(const in float NdotL, const in float NdotV, const in float k)
 float G_SmithGGXCorrelated(const in float NdotV, const in float NdotL, const in float roughness)
 {
 	float k = pow(roughness + 1.0, 2.0) / 8.0;
-	return G1(NdotL, k) * G1(NdotV, k);
+	
+	if(u_geometry_shadowing == 0) //G1 aproximation
+	{
+		return G1(NdotL, k) * G1(NdotV, k);
+	}
+	else if(u_geometry_shadowing == 1) // G2 aproximation
+	{
+		return G2(NdotL,NdotV,k);
+	}
+
 }
 
 //Cook-Torrance specular reflection model
@@ -199,9 +205,10 @@ vec3 specularBRDF( const in float roughness, const in vec3 f0, const in float Nd
 }
 
 //Burley Diffuse Reflections
-float BurleyBRDF ( const in float NdotV, const in float NdotL, const in float LdotH, const in float alpha)
+float BurleyBRDF ( const in float NdotV, const in float NdotL, const in float LdotH, const in float linear_roughness)
 {
-    float f90 = 0.5 + 2.0 * alpha * LdotH * LdotH;
+    float a = linear_roughness * linear_roughness;
+    float f90 = 0.5 + 2.0 * a * LdotH * LdotH;
     float light_scatter = F_Schlick(NdotL, 1.0, f90);
     float view_scatter  = F_Schlick(NdotV, 1.0, f90);
     return light_scatter * view_scatter * RECIPROCAL_PI;
@@ -213,7 +220,7 @@ float LambertBRDF() {
 }
 
 vec3 BRDF(const in vec3 L, const in vec3 V, const in vec3 N, const in vec3 albedo, const in float metalness, const in float linear_roughness, 
-	const in vec3 light_color, const in float light_intensity, const in float light_attenuation, const in float shadow_factor, const in bool specular_light, const in int light_model)
+	const in vec3 light_color, const in float light_intensity, const in float light_attenuation, const in float shadow_factor, const in bool specular_light)
 {
 	//Compute half vector
 	vec3 H = (L + V) / length(L + V);
@@ -236,13 +243,13 @@ vec3 BRDF(const in vec3 L, const in vec3 V, const in vec3 N, const in vec3 albed
 
 	//Compute the diffuse
 	vec3 diffuse;
-	if(light_model == 1) //Lambertian reflectance
+	if(u_diffuse_reflection == 0) //Lambertian reflectance
 	{
 		diffuse = diffuse_color * LambertBRDF(); 
 	}
-	else if(light_model == 2)//Burley diffuse
+	else if(u_diffuse_reflection == 1)//Burley diffuse
 	{
-		diffuse = diffuse_color * BurleyBRDF(NdotV,NdotL,LdotH,linear_roughness * linear_roughness); 
+		diffuse = diffuse_color * BurleyBRDF(NdotV,NdotL,LdotH,linear_roughness); 
 	}
 
 	//Add diffuse and specular reflection
@@ -256,6 +263,66 @@ vec3 BRDF(const in vec3 L, const in vec3 V, const in vec3 N, const in vec3 albed
 
 	//Return light computation
 	return light;	
+}
+
+\gamma_correction
+
+//Gamma support uniform
+uniform bool u_gamma_correction;
+
+vec3 degamma(vec3 color)
+{
+	if(u_gamma_correction) return pow(color,vec3(2.2));
+	else return color;
+}
+
+vec4 degamma(vec4 color)
+{
+	if(u_gamma_correction) return vec4(pow(color.rgb,vec3(2.2)),color.a);
+	else return color;
+}
+
+vec3 gamma(vec3 color)
+{
+	if(u_gamma_correction)
+	{
+		vec3 gamma_factor = vec3(1.0 / 2.2);
+		return pow(color,gamma_factor);
+	} 
+	else return color;
+}
+
+vec4 gamma(vec4 color)
+{
+	if(u_gamma_correction)
+	{
+		vec3 gamma_factor = vec3(1.0 / 2.2);
+		return vec4(pow(color.rgb,gamma_factor),color.a);
+	} 
+	else return color;
+}
+
+\tone_mapper
+
+//Uniforms
+uniform float u_scale; //color scale before tonemapper
+uniform float u_average_lum; 
+uniform float u_lumwhite2;
+uniform float u_igamma; //inverse gamma
+
+
+void main() {
+	vec4 color = texture2D( u_texture, v_uv );
+	vec3 rgb = color.xyz;
+
+	float lum = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+	float L = (u_scale / u_average_lum) * lum;
+	float Ld = (L * (1.0 + L / u_lumwhite2)) / (1.0 + L);
+
+	rgb = (rgb / lum) * Ld;
+	rgb = max(rgb,vec3(0.001));
+	rgb = pow( rgb, vec3( u_igamma ) );
+	gl_FragColor = vec4( rgb, color.a );
 }
 
 
@@ -365,9 +432,9 @@ vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in
 				{
 					light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_attenuation, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
 				}
-				else if(u_light_model > 0) //PBR model
+				else if(u_light_model == 1) //PBR model
 				{
-					light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_lights_color[i], light_intensity, light_attenuation, shadow_factor, u_specular_light, u_light_model);
+					light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_lights_color[i], light_intensity, light_attenuation, shadow_factor, u_specular_light);
 				}
 
 			}
@@ -402,9 +469,9 @@ vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in
 					{
 						light += PhongEquation(u_lights_color[i], light_vector, light_intensity, light_attenuation, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
 					}
-					else if(u_light_model > 0) //PBR model
+					else if(u_light_model == 1) //PBR model
 					{
-						light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_lights_color[i], light_intensity, light_attenuation, shadow_factor, u_specular_light, u_light_model);
+						light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_lights_color[i], light_intensity, light_attenuation, shadow_factor, u_specular_light);
 					}
 				}
 
@@ -425,9 +492,9 @@ vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in
 					{
 						light += PhongEquation(u_lights_color[i], light_vector, light_intensity, 1.0, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
 					}
-					else if(u_light_model > 0) //PBR model
+					else if(u_light_model == 1) //PBR model
 					{
-						light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_lights_color[i], light_intensity, 1.0, shadow_factor, u_specular_light, u_light_model);
+						light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_lights_color[i], light_intensity, 1.0, shadow_factor, u_specular_light);
 					}
 			}			
 		}
@@ -471,9 +538,9 @@ vec3 Multipass(const in vec3 normal_vector, const in vec3 view_vector, const in 
 		{
 			light += PhongEquation(u_light_color, light_vector, light_intensity, light_attenuation, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
 		}
-		else if(u_light_model > 0) //PBR model
+		else if(u_light_model == 1) //PBR model
 		{
-			light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_light_color, light_intensity, light_attenuation, shadow_factor, u_specular_light, u_light_model);
+			light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_light_color, light_intensity, light_attenuation, shadow_factor, u_specular_light);
 		}
 
 	}
@@ -508,9 +575,9 @@ vec3 Multipass(const in vec3 normal_vector, const in vec3 view_vector, const in 
 			{
 				light += PhongEquation(u_light_color, light_vector, light_intensity, light_attenuation, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
 			}
-			else if(u_light_model > 0) //PBR model
+			else if(u_light_model == 1) //PBR model
 			{
-				light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_light_color, light_intensity, light_attenuation, shadow_factor, u_specular_light, u_light_model);
+				light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_light_color, light_intensity, light_attenuation, shadow_factor, u_specular_light);
 			} 
 		}
 	}
@@ -530,9 +597,9 @@ vec3 Multipass(const in vec3 normal_vector, const in vec3 view_vector, const in 
 		{
 			light += PhongEquation(u_light_color, light_vector, light_intensity, 1.0, normal_vector, view_vector, omr.y, omr.z, shadow_factor, u_specular_light);
 		}
-		else if(u_light_model > 0) //PBR model
+		else if(u_light_model == 1) //PBR model
 		{
-			light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_light_color, light_intensity, 1.0, shadow_factor, u_specular_light, u_light_model);
+			light += BRDF(light_vector, view_vector, normal_vector, albedo, omr.y, omr.z, u_light_color, light_intensity, 1.0, shadow_factor, u_specular_light);
 		}
 	}
 
@@ -597,13 +664,16 @@ uniform vec3 u_emissive_factor;
 //Output
 out vec4 FragColor;
 
+//Includes
+#include gamma_correction
+
 void main()
 {
 	//Material color
-	vec4 color = u_color;
+	vec4 color = degamma(u_color);
 
 	//Load color texture values with texture interpolated coordinates
-	color *= texture2D( u_color_texture, v_uv );	
+	color *= degamma(texture2D( u_color_texture, v_uv ));	
 
 	//Mask
 	if(color.a < u_alpha_cutoff)
@@ -616,7 +686,8 @@ void main()
 		color.rgb += emissive_light;
 	}
 
-	FragColor = color;
+	//Output: Gamma space color
+	FragColor = gamma(color);
 
 }
 
@@ -654,16 +725,17 @@ out vec4 FragColor;
 #include shadow_test
 #include phong
 #include PBR
+#include gamma_correction
 #include lighting
 
 void main()
 {
 	//Material color
-	vec4 color = u_color;
+	vec4 color = degamma(u_color);
 
 	//Load texture values with texture interpolated coordinates
 	vec3 tangent_space_normal = texture2D( u_normal_texture, v_uv ).xyz;
-	color *= texture2D( u_color_texture, v_uv );	
+	color *= degamma(texture2D( u_color_texture, v_uv ));	
 	vec3 omr = texture2D(u_omr_texture,v_uv).xyz;
 
 	//Mask
@@ -696,12 +768,12 @@ void main()
 	color.rgb *= light;
 	if(u_last_iteration)
 	{
-		vec3 emissive_light = u_emissive_factor * texture2D(u_emissive_texture,v_uv).xyz;
+		vec3 emissive_light = u_emissive_factor * degamma(texture2D(u_emissive_texture,v_uv).xyz);
 		color.rgb += emissive_light;
 	}
 
-	//Output
-	FragColor = color;
+	//Output: Gamma space color
+	FragColor = gamma(color);
 }
 
 \quad.vs
@@ -748,6 +820,7 @@ layout(location = 1) out vec3 I1;
 #include shadow_test
 #include phong
 #include PBR
+#include gamma_correction
 #include lighting
 
 void main()
@@ -766,7 +839,7 @@ void main()
 		discard;
 
 	//Assign each buffer value to its material property
-	vec3 color = gb0.xyz;
+	vec3 color = degamma(gb0.xyz);
 	vec3 normal_vector = (gb1.xyz * 2.0 - vec3(1.0)); //normals must be converted from 0..1 to -1..+1
 	vec3 omr = gb2.xyz;
 
@@ -797,11 +870,11 @@ void main()
 	if(u_emissive_materials && u_last_iteration)
 	{
 		vec3 emissive_light = vec3(gb0.a,gb1.a,gb2.a);
-		color += emissive_light;
+		color += degamma(emissive_light);
 	} 
 
 	//Fill buffers
-	I0 = color;
+	I0 = gamma(color);
 	I1 = light;
 
 }
@@ -839,17 +912,18 @@ layout(location = 2) out vec4 GB2;
 
 //Includes
 #include normal_mapping
+#include gamma_correction
 
 void main()
 {
 	//Material color
-	vec4 color = u_color;
+	vec4 color = degamma(u_color);
 
 	//Load texture values with texture interpolated coordinates
-	color *= texture2D( u_color_texture, v_uv ); 
+	color *= degamma(texture2D( u_color_texture, v_uv )); 
 	vec3 tangent_space_normal = texture2D( u_normal_texture, v_uv ).xyz; 
 	vec3 omr = texture2D(u_omr_texture,v_uv).xyz;
-	vec3 emissive_light = u_emissive_factor * texture2D(u_emissive_texture,v_uv).xyz;
+	vec3 emissive_color = u_emissive_factor * degamma(texture2D(u_emissive_texture,v_uv).xyz);
 
 	//Mask
 	if(color.a < u_alpha_cutoff)
@@ -866,10 +940,14 @@ void main()
 	//Compress normal to space [0,...,1]
 	normal_vector = normal_vector * 0.5 + vec3(0.5);
 
+	//Reconvert color to gamma space again
+	color = gamma(color);
+	emissive_color = gamma(emissive_color);
+
 	//Fill buffers
-	GB0 = vec4(color.xyz,emissive_light.x);
-	GB1 = vec4(normal_vector, emissive_light.y);
-	GB2 = vec4(omr,emissive_light.z);
+	GB0 = vec4(color.rgb,emissive_color.x);
+	GB1 = vec4(normal_vector, emissive_color.y);
+	GB2 = vec4(omr,emissive_color.z);
 }
 
 

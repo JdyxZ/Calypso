@@ -103,8 +103,19 @@ namespace GTR {
 
 		enum LightModel {
 			Phong = 0,
-			BRDF_Lambert = 1,
-			BRDF_Burley = 2
+			BRDF = 1
+		};
+
+		enum DiffuseReflection
+		{
+			Lambert = 0,
+			Burley = 1
+		};
+
+		enum SmithGGXAproximation
+		{
+			G1 = 0,
+			G2 = 1
 		};
 
 		enum LightPass {
@@ -126,10 +137,13 @@ namespace GTR {
 		bool occlusion; //Whether we enable prefab's occlusion texture or not.
 		bool specular_light; //Whether we enable prefab's roughness metallic texture or not.
 		bool normal_mapping; //Whether we are redering with normal map or interpolated normals.
+		bool gamma_correction; // Show the difference between working in linear space and reconverting to gamma space and only work in gamma space.
 
 		//Render properties
 		RenderPipeline render_pipeline; //Whether we are rendering with forward or deferred pipeline. By deafult we set the flag to Deferred.
 		LightModel light_model; //The light equation we are using
+		DiffuseReflection diffuse_reflection; // Diffuse equation
+		SmithGGXAproximation smith_aproximation; // Smith geomtry shadowing equation aproximation
 		LightPass light_pass; //Whether we are rendering with Single Pass or Multi Pass. By deafult we set the flag to Single Pass.
 
 		//Shadows
@@ -150,6 +164,7 @@ namespace GTR {
 		bool light_trigger; //Triggers if a new light has been added to the scene or an old one has been deleted.
 		bool shadow_visibility_trigger; //Triggers changes in shadow casting or light visibility for lights that cast shadows.
 		bool shadow_resolution_trigger; //Triggers if shadow resolution has been changed.
+		bool light_model_trigger;
 
 		//Input text buffer
 		const static int buffer_size = 25;
@@ -172,6 +187,9 @@ namespace GTR {
 
 		//Trigger method
 		void resetTriggers();
+
+		//Light model correction
+		void SwitchLightModel();
 	};
 
 };

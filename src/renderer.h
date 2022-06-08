@@ -64,10 +64,12 @@ namespace GTR {
 
 		//Forward pipeline
 		void renderForward();
+		void setForwardSceneUniforms(Shader* shader);
 		void renderMesh(Shader* shader, RenderCall* rc, Camera* camera); 
 
 		//Deferred pipeline
 		void renderDeferred();
+		void setDeferredSceneUniforms(Shader* shader);
 		void GBuffers();
 		void clearGBuffers();
 		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera);
@@ -79,6 +81,10 @@ namespace GTR {
 		void renderTransparentObjects(); 
 		void showBuffers(); 
 		void viewportEmissive(); 
+
+		//Gamma correction
+		Vector3 degamma(Vector3 color);
+		Vector3 gamma(Vector3 color);
 
 		//Shadow Atlas
 		void updateShadowAtlas();
