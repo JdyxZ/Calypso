@@ -17,12 +17,12 @@ GTR::Scene::Scene()
 	main_camera = NULL;
 
 	//Scene algorithms
+	light_status = true;
 	alpha_sorting = true;
 	emissive_materials = true;
 	occlusion = true;
 	specular_light = true;
 	normal_mapping = true;
-	gamma_correction = true;
 
 	//Render properties
 	render_pipeline = Scene::Deferred;
@@ -38,11 +38,17 @@ GTR::Scene::Scene()
 	show_atlas = false;
 	num_shadows = 0;
 
-	//GBuffers debugging
+	//Deferred buffers
 	show_buffers = false;
 	toggle_buffers = false;
+	buffer_range = HDR;
+
+	//Color correction algorithms
+	gamma_correction = true;
+	tone_mapper = true;
 
 	//Scene triggers: We set some of them true just for the first iteration
+	light_switch_trigger = false;
 	resolution_trigger = true;
 	entity_trigger = true;
 	prefab_trigger = true;
@@ -50,6 +56,7 @@ GTR::Scene::Scene()
 	shadow_visibility_trigger = true;
 	shadow_resolution_trigger = true;
 	light_model_trigger = false;
+	buffer_range_trigger = false;
 	
 }
 
@@ -121,6 +128,9 @@ bool GTR::Scene::load(const char* filename)
 	//Read global properties
 	background_color = readJSONVector3(json, "background_color", background_color);
 	ambient_light = readJSONVector3(json, "ambient_light", ambient_light);
+	color_scale = readJSONNumber(json, "color_scale", color_scale);
+	avarage_lum = readJSONNumber(json, "avarage_lum", avarage_lum);
+	white_lum = readJSONNumber(json, "white_lum", white_lum);
 	Vector3 eye = readJSONVector3(json, "camera_position", main_camera->eye);
 	Vector3 center = readJSONVector3(json, "camera_target", main_camera->center);
 	float fov = readJSONNumber(json, "camera_fov", main_camera->fov);
@@ -186,10 +196,12 @@ bool GTR::Scene::save()
 	writeJSONString(scene_json, "environment", "night.hdre");
 	writeJSONVector3(scene_json, "background_color", background_color);
 	writeJSONVector3(scene_json, "ambient_light", ambient_light);
+	writeJSONNumber(scene_json, "color_scale", color_scale);
+	writeJSONNumber(scene_json, "avarage_lum", avarage_lum);
+	writeJSONNumber(scene_json, "white_lum", white_lum);
 	writeJSONVector3(scene_json, "camera_position", this->main_camera->eye);
 	writeJSONVector3(scene_json, "camera_target", this->main_camera->center);
 	writeJSONNumber(scene_json, "camera_fov", 80);
-	
 
 	//Entitiy JSON
 	cJSON* entities_json = cJSON_AddArrayToObject(scene_json, "entities");
@@ -280,46 +292,49 @@ void GTR::Scene::resetTriggers()
 	this->main_camera->camera_trigger = false;
 }
 
+void GTR::Scene::LightSwitch()
+{
+	for (auto it = this->entities.begin(); it != this->entities.end(); ++it)
+	{
+		//Current entity
+		BaseEntity* ent = *it;
+
+		//Check if it is a light
+		if (ent->entity_type == LIGHT)
+		{
+			//Current light
+			LightEntity* light = (LightEntity*)ent;
+
+			//Update light visibility
+			if (this->light_status) //Show light
+				light->visible = true;
+			else //Hide light
+				light->visible = false;
+		}
+	}
+}
+
 void GTR::Scene::SwitchLightModel()
 {
 	float intensity_factor = 5.f;
 
-	switch (this->light_model)
+	for (auto it = this->entities.begin(); it != this->entities.end(); ++it)
 	{
-	case(BRDF):
-		for (auto it = this->entities.begin(); it != this->entities.end(); ++it)
+		//Current entity
+		BaseEntity* ent = *it;
+
+		//Check if it is a light
+		if (ent->entity_type == LIGHT)
 		{
-			//Current entity
-			BaseEntity* ent = *it;
+			//Current light
+			LightEntity* light = (LightEntity*)ent;
 
-			//Check if it is a light
-			if (ent->entity_type == LIGHT)
-			{
-				//Current light
-				LightEntity* light = (LightEntity*)ent;
-
-				//Update light intensity
+			//Update light intensity
+			if(this->light_model == BRDF)
 				light->intensity *= intensity_factor;
-			}
-		}
-		break;
-	case(Phong):
-		for (auto it = this->entities.begin(); it != this->entities.end(); ++it)
-		{
-			//Current entity
-			BaseEntity* ent = *it;
-			
-			//Check if it is a light
-			if (ent->entity_type == LIGHT)
-			{
-				//Current light
-				LightEntity* light = (LightEntity*)ent;
-
-				//Update light intensity
+			else if(this->light_model == Phong)
 				light->intensity /= intensity_factor;
-			}
 		}
-		break;
 	}
 }
 

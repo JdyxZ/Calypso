@@ -106,6 +106,11 @@ namespace GTR {
 			BRDF = 1
 		};
 
+		enum BufferRange {
+			SDR = 0, //1 byte per color component
+			HDR = 1, //4 bytes per color component
+		};
+
 		enum DiffuseReflection
 		{
 			Lambert = 0,
@@ -129,15 +134,18 @@ namespace GTR {
 		//Scene properties
 		Vector3 background_color;
 		Vector3 ambient_light;
+		float color_scale;
+		float avarage_lum;
+		float white_lum;
 		Camera* main_camera;
 
 		//Scene algorithms
+		bool light_status; //Shows or hides scene lights (like a switch)
 		bool alpha_sorting; //Whether we sort render calls or not.
 		bool emissive_materials; //Whether we enable prefab's emissive texture or not.
 		bool occlusion; //Whether we enable prefab's occlusion texture or not.
 		bool specular_light; //Whether we enable prefab's roughness metallic texture or not.
 		bool normal_mapping; //Whether we are redering with normal map or interpolated normals.
-		bool gamma_correction; // Show the difference between working in linear space and reconverting to gamma space and only work in gamma space.
 
 		//Render properties
 		RenderPipeline render_pipeline; //Whether we are rendering with forward or deferred pipeline. By deafult we set the flag to Deferred.
@@ -148,23 +156,32 @@ namespace GTR {
 
 		//Shadows
 		Texture* shadow_atlas; //Shadow map of the lights of the scene
+		bool show_atlas; //Enables or disables the display of the shadow atlas.
+		const char* shadow_resolutions[4] = { "512 x 512", "1024 x 1024", "2048 x 2048", "4096 x 4096" };
 		int atlas_resolution_index; //The corresponding index in the array of shadow atlas resolutions
 		int atlas_scope; //The current shadow scope in case that all shadow maps doesn't fit into the screen.
-		bool show_atlas; //Enables or disables the display of the shadow atlas.
 		int num_shadows; //The number of shadows in the scene.
 
 		//Deferred buffers
 		bool show_buffers;
 		bool toggle_buffers;
+		BufferRange buffer_range;
+
+		//Color correction
+		bool gamma_correction; // Show the difference between working in linear space and reconverting to gamma space and only work in gamma space.
+		bool tone_mapper; //Use tone mapper to improve visual perception.
 
 		//Scene triggers
+		bool light_switch_trigger; //Triggers if the user has checked or un checked the light switch checkbox.
 		bool resolution_trigger; //Triggers if a resolution 
 		bool entity_trigger; //Triggers if an entity has changed its visibility or a visible entity has changed its model.
 		bool prefab_trigger; //Triggers if a new prefab has been added to the scene or an old one has been deleted.
 		bool light_trigger; //Triggers if a new light has been added to the scene or an old one has been deleted.
 		bool shadow_visibility_trigger; //Triggers changes in shadow casting or light visibility for lights that cast shadows.
 		bool shadow_resolution_trigger; //Triggers if shadow resolution has been changed.
-		bool light_model_trigger;
+		bool light_model_trigger; //Triggers if light model has been changed.
+		bool buffer_range_trigger; //Triggers if the deferred buffer range has changed.
+
 
 		//Input text buffer
 		const static int buffer_size = 25;
@@ -187,6 +204,9 @@ namespace GTR {
 
 		//Trigger method
 		void resetTriggers();
+
+		//Light switch
+		void LightSwitch();
 
 		//Light model correction
 		void SwitchLightModel();

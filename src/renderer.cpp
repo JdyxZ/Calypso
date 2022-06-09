@@ -664,7 +664,10 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 //Deferred pipeline
 void GTR::Renderer::renderDeferred()
 {
-	
+	//Set buffer range
+	if (scene->buffer_range == Scene::SDR) buffer_range = GL_UNSIGNED_BYTE;
+	else if (scene->buffer_range == Scene::HDR) buffer_range = GL_FLOAT;
+
 	//Create and render the GBuffers
 	GBuffers();
 	//Illumination and transparencies
@@ -721,7 +724,7 @@ void GTR::Renderer::setDeferredSceneUniforms(Shader* shader)
 void GTR::Renderer::GBuffers()
 {
 	//Crete the gbuffers fbo if they don't exist yet
-	if (!gbuffers_fbo || scene->resolution_trigger)
+	if (!gbuffers_fbo || scene->resolution_trigger || scene->buffer_range_trigger)
 	{
 		if (gbuffers_fbo)
 		{
@@ -736,7 +739,7 @@ void GTR::Renderer::GBuffers()
 		gbuffers_fbo->create(window_size.x, window_size.y,
 			3, 					//three textures
 			GL_RGBA, 			//four channels
-			GL_UNSIGNED_BYTE,	//1 byte
+			buffer_range,		//SDR or HDR
 			true);				//add depth_texture
 
 	}
@@ -882,7 +885,7 @@ void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camer
 void GTR::Renderer::IlluminationNTransparencies()
 {
 	//Crete the illumination fbo if they don't exist yet
-	if (!illumination_fbo || scene->resolution_trigger)
+	if (!illumination_fbo || scene->resolution_trigger || scene->buffer_range_trigger)
 	{
 		if (illumination_fbo)
 		{
@@ -897,7 +900,7 @@ void GTR::Renderer::IlluminationNTransparencies()
 		illumination_fbo->create(window_size.x, window_size.y,
 			2, 					//two texture
 			GL_RGB, 			//three channels
-			GL_UNSIGNED_BYTE,	//1 byte
+			buffer_range,		//SDR or HDR
 			true);				//add depth_texture
 	}
 
@@ -1277,7 +1280,7 @@ void GTR::Renderer::updateShadowAtlas()
 	if (scene->shadow_resolution_trigger)
 	{
 		string shadow_resolution;
-		shadow_resolution.assign(Application::instance->shadow_resolutions[scene->atlas_resolution_index]);
+		shadow_resolution.assign(scene->shadow_resolutions[scene->atlas_resolution_index]);
 		shadow_map_resolution = strtoul(shadow_resolution.substr(0, shadow_resolution.find_first_of(" ")).c_str(), NULL, 10);
 		cout << "Resolution successfully changed" << endl;
 	}

@@ -195,6 +195,7 @@ void Application::update(double seconds_elapsed)
 	}
 
 	if (scene->light_model_trigger) scene->SwitchLightModel();
+	if (scene->light_switch_trigger) scene->LightSwitch();
 }
 
 void Application::renderDebugGizmo()
@@ -275,39 +276,59 @@ void Application::renderDebugGUI(void)
 {
 #ifndef SKIP_IMGUI //to block this code from compiling if we want
 
+	//Support boolean
+	bool lights = !renderer->lights.empty();
+
 	//System stats
-	ImGui::Text(getGPUStats().c_str());					   // Display some text (you can use a format strings too)
+	ImGui::Text((getGPUStats() + "\n").c_str());					   // Display some text (you can use a format strings too)	
 
 	//Scene algorithms
-	ImGui::Checkbox("Entity creator", &render_editor);
+	ImGui::Text("\nScene algorithms");
 	ImGui::Checkbox("Wireframe", &render_wireframe);
 	ImGui::Checkbox("Grid", &render_grid);
+	scene->light_switch_trigger = ImGui::Checkbox("Lights", &scene->light_status);
 	ImGui::Checkbox("Alpha sorting", &scene->alpha_sorting);
 	ImGui::Checkbox("Emissive materials", &scene->emissive_materials);
-	ImGui::Checkbox("Gamma correction", &scene->gamma_correction);
 
-	if (!renderer->lights.empty())
+	if (lights)
 	{
 		//Textures
-		ImGui::Checkbox("Occlussion texture", &scene->occlusion);
-		ImGui::Checkbox("Specular light", &scene->specular_light);
+		ImGui::Checkbox("Occlussion", &scene->occlusion);
+		ImGui::Checkbox("Specular", &scene->specular_light);
 		ImGui::Checkbox("Normal map", &scene->normal_mapping);
 
-		//GBuffers
-		if(scene->render_pipeline == GTR::Scene::Deferred)
-			ImGui::Checkbox("GBuffers", &scene->show_buffers);
+		//Shadows
+		ImGui::Text("\nShadows");
+		ImGui::Checkbox("Shadow Atlas", &scene->show_atlas); //Shadow Atlas
+		scene->shadow_resolution_trigger = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, scene->shadow_resolutions, IM_ARRAYSIZE(scene->shadow_resolutions)); //Shadow Atlas resolution
+	}
 
-		//Shadow atlas
-		ImGui::Checkbox("Shadow Atlas", &scene->show_atlas);
+	//Gamma space and tone mapper
+	if (scene->render_pipeline == GTR::Scene::Forward || scene->buffer_range == GTR::Scene::HDR)
+	{
+		ImGui::Text("\nColor correction");
+		ImGui::Checkbox("Gamma correction", &scene->gamma_correction);
+		ImGui::Checkbox("Tone mapper", &scene->tone_mapper);
+	}
 
-		//Shadow resolution
-		scene->shadow_resolution_trigger = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, shadow_resolutions, IM_ARRAYSIZE(shadow_resolutions));
+	if(lights)
+	{
+		//Deferred buffers
+		if (scene->render_pipeline == GTR::Scene::Deferred)
+		{
+			ImGui::Text("\nDeferred buffers");
+			ImGui::Checkbox("Buffers", &scene->show_buffers);
+			scene->buffer_range_trigger = ImGui::Combo("Buffer range", (int*)&scene->buffer_range, "SDR (1 byte)\0HDR (4 bytes)", 2);
+		}
+																																												  
+		//Pipeline
+		ImGui::Text("\nPipeline");
 
 		//Render pipeline
-		ImGui::Combo("Render Pipeline", (int*)&scene->render_pipeline, "Forward\0Deferred", 2);
+		ImGui::Combo("Render Pipeline", (int*)&scene->render_pipeline, "Forward\0Deferred", 2); 
 
 		//Light model
-		scene->light_model_trigger = ImGui::Combo("Light Model", (int*)&scene->light_model, "Phong\0BRDF", 2);
+		scene->light_model_trigger = ImGui::Combo("Light Model", (int*)&scene->light_model, "Phong\0BRDF", 2); 
 
 		//BRDF properties
 		if (scene->light_model == GTR::Scene::BRDF)
@@ -326,13 +347,20 @@ void Application::renderDebugGUI(void)
 				ImGui::SliderInt("Render Type", (int*)&scene->light_pass, GTR::Scene::Multipass, GTR::Scene::Singlepass, "Multipass");
 				break;
 		}
-
-		//Ambient color
-		ImGui::ColorEdit3("Ambient Light", scene->ambient_light.v);
 	}
+
+	//Scene properties
+	ImGui::Text("\nScene properties");
+
+	//Ambient color
+	if(lights)
+		ImGui::ColorEdit3("Ambient Light", scene->ambient_light.v);
 
 	//Background Color
 	ImGui::ColorEdit3("Background color", scene->background_color.v);
+
+	//Scene entities
+	ImGui::Text("\nScene entities");
 
 	//add info to the debug panel about the camera
 	if (ImGui::TreeNode(camera, "Camera")) {
@@ -372,12 +400,12 @@ void Application::renderEntityEditor()
 #ifndef SKIP_IMGUI //to block this code from compiling if we want
 
 	//Select entity
-	ImGui::Combo("Entity type", &current_entity_type, entity_types, IM_ARRAYSIZE(entity_types));
+	ImGui::Combo("Entity type", &current_entity_type, "PREFAB\0LIGHT", 2);
 	
 	//Entity features
 	if (current_entity_type)
 	{
-		ImGui::Combo("Light type", &current_light_type, light_types, IM_ARRAYSIZE(light_types));
+		ImGui::Combo("Light type", &current_light_type, "POINT\0SPOT\0DIRECTIONAL", 3);
 		bool create_light = ImGui::Button("Create");
 
 		if (create_light)
@@ -469,6 +497,7 @@ void Application::onKeyDown( SDL_KeyboardEvent event )
 			io->AddInputCharacter('g');
 			break;
 		case SDLK_h:
+			render_editor = !render_editor;
 			io->AddInputCharacter('h');
 			break;
 		case SDLK_i:

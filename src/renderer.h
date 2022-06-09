@@ -46,6 +46,9 @@ namespace GTR {
 		//Shadow Resolution
 		int shadow_map_resolution = 2048; //Default Resolution
 
+		//Buffer range
+		int buffer_range = GL_UNSIGNED_BYTE;
+
 		//Constructor
 		Renderer(Scene* scene, Camera* camera, int window_width, int window_height);
 

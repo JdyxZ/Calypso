@@ -41,5 +41,8 @@ Deferred
 
 PBR
 
-- 
+- El tone mapper solo hay que activarlo si estamos trabajando en HDR space color (forward y deferred con fbo con GL_FLOAT)?
+- Qué representa cada una de las uniforms del tone mapper?
+- SDR -> 1 byte // HDR -> 4 bytes?
+- El gamma correction está bien implementado (enseñar lo que pasa cuando trabajamos en HDR?
 

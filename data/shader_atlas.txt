@@ -305,24 +305,22 @@ vec4 gamma(vec4 color)
 \tone_mapper
 
 //Uniforms
+uniform bool u_tone_mapper;
 uniform float u_scale; //color scale before tonemapper
 uniform float u_average_lum; 
-uniform float u_lumwhite2;
-uniform float u_igamma; //inverse gamma
+uniform float u_white_lum;
 
+void main(inout vec3 color) {
 
-void main() {
-	vec4 color = texture2D( u_texture, v_uv );
-	vec3 rgb = color.xyz;
+	if(u_tone_mapper)
+	{
+		float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+		float L = (u_scale / u_average_lum) * lum;
+		float Ld = (L * (1.0 + L / u_white_lum)) / (1.0 + L);
 
-	float lum = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
-	float L = (u_scale / u_average_lum) * lum;
-	float Ld = (L * (1.0 + L / u_lumwhite2)) / (1.0 + L);
-
-	rgb = (rgb / lum) * Ld;
-	rgb = max(rgb,vec3(0.001));
-	rgb = pow( rgb, vec3( u_igamma ) );
-	gl_FragColor = vec4( rgb, color.a );
+		color = (color / lum) * Ld;
+		color = max(color,vec3(0.001));
+	}
 }
 
 
@@ -682,7 +680,7 @@ void main()
 	//Emissive materials
 	if(u_emissive_materials)
 	{
-		vec3 emissive_light = u_emissive_factor * texture2D(u_emissive_texture,v_uv).xyz;
+		vec3 emissive_light = u_emissive_factor * degamma(texture2D(u_emissive_texture,v_uv).xyz);
 		color.rgb += emissive_light;
 	}
 
