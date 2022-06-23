@@ -57,6 +57,11 @@ GTR::Scene::Scene()
 	shadow_resolution_trigger = true;
 	light_model_trigger = false;
 	buffer_range_trigger = false;
+
+	//FX properties
+	contrast = 1.0;
+	saturation = 1.0;
+	vigneting = 0.0;
 	
 }
 

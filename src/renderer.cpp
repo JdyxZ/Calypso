@@ -53,6 +53,12 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	gbuffers_fbo = NULL;
 	illumination_fbo = NULL;
 
+	//PostFx Tex
+	postTexA = NULL;
+	postTexB = NULL;
+	postTexC = NULL;
+	postTexD = NULL;
+
 	//Windows size
 	window_size = Vector2(window_width, window_height);
 }
@@ -673,6 +679,8 @@ void GTR::Renderer::renderDeferred()
 	//Illumination and transparencies
 	IlluminationNTransparencies();
 
+	InitPostFxTextures();
+
 	//Show Buffers or render the final frame
 	if (scene->show_buffers)
 		showBuffers();
@@ -682,9 +690,112 @@ void GTR::Renderer::renderDeferred()
 		glViewport(0, 0, window_size.x, window_size.y);
 
 		//Final frame
-		illumination_fbo->color_textures[0]->toViewport();
+		applyFx(camera, illumination_fbo->color_textures[0], gbuffers_fbo->depth_texture);
 	}
-	
+
+}
+
+void GTR::Renderer::InitPostFxTextures()
+{
+	//Crete the illumination fbo if they don't exist yet
+	if ((!postTexA && !postTexB && !postTexC && !postTexD) || scene->resolution_trigger || scene->buffer_range_trigger)
+	{
+		if (postTexA && postTexB && postTexC && postTexD)
+		{
+			delete postTexA;
+			delete postTexB;
+			delete postTexC;
+			postTexA = NULL;
+			postTexB = NULL;
+			postTexC = NULL;
+			postTexD = NULL;
+		}
+
+		//Create new PostFx Textures
+		postTexA = new Texture(window_size.x, window_size.y, GL_RGB, GL_FLOAT, false);
+		postTexB = new Texture(window_size.x, window_size.y, GL_RGB, GL_FLOAT, false);
+		postTexC = new Texture(window_size.x, window_size.y, GL_RGB, GL_FLOAT, false);
+		postTexD = new Texture(window_size.x, window_size.y, GL_RGB, GL_FLOAT, false);
+	}
+}
+
+void GTR::Renderer::applyFx(Camera* camera, Texture* color_tex, Texture* depth_tex) 
+{
+	Texture* current_tex = color_tex;
+
+	//first FX
+	FBO* fbo = Texture::getGlobalFBO(postTexA);
+	loadFx(GRAY, fbo, current_tex, postTexC, "grayscale");
+	std::swap(postTexA, postTexB);
+	//second FX
+	fbo = Texture::getGlobalFBO(postTexA);
+	loadFx(CONTRAST, fbo, current_tex, postTexC, "contrast");
+	std::swap(postTexA, postTexB);
+	//third FX
+	fbo = Texture::getGlobalFBO(postTexA);
+	loadFx(BLUR1, fbo, current_tex, postTexC, "blur");
+	std::swap(postTexA, postTexB);
+
+	//fourth FX
+	fbo = Texture::getGlobalFBO(postTexA);
+	loadFx(BLUR2, fbo, current_tex, postTexC, "blur");
+	std::swap(postTexA, postTexB);
+
+	//fifth FX
+	fbo = Texture::getGlobalFBO(postTexA);
+	loadFx(MIX, fbo, current_tex, postTexC, "mix");
+	std::swap(postTexA, postTexB);
+
+	//sixth FX
+	fbo = Texture::getGlobalFBO(postTexA);
+	loadFx(MOTIONBLUR, fbo, current_tex, gbuffers_fbo->depth_texture, "motionblur");
+	std::swap(postTexA, postTexB);
+
+
+	//show on screen
+	current_tex->toViewport();
+}
+
+void GTR::Renderer::loadFx(int FxType, FBO* fbo, Texture* current_Tex, Texture* alter_tex, char* shadername) 
+{
+	fbo->bind();
+	Shader* FXShader = Shader::Get(shadername);
+	std::cout << shadername << std::endl;
+	FXShader->enable();
+	if (FxType == GTR::eFxType::GRAY)
+	{
+		FXShader->setUniform("u_saturation", &scene->saturation);
+		FXShader->setUniform("u_vigneting", &scene->vigneting);
+	}
+	else if (FxType == GTR::eFxType::CONTRAST)
+	{
+		FXShader->setUniform("u_contrast", &scene->contrast);
+	}
+	else if (FxType == GTR::eFxType::BLUR1)
+	{
+		FXShader->setUniform("u_offset", vec2(1.0 / current_Tex->width, 0.0));
+		FXShader->setUniform("u_intensity", 1.0f);
+
+	}
+	else if (FxType == GTR::eFxType::BLUR2)
+	{
+		FXShader->setUniform("u_offset", vec2(1.0 / current_Tex->width, 0.0));
+		FXShader->setUniform("u_intensity", 1.0f);
+
+	}
+	else if (FxType == GTR::eFxType::MIX)
+	{
+		FXShader->setUniform("u_intensity", 1.0f);
+		FXShader->setUniform("u_textureB", alter_tex, 1);
+	}
+	else if (FxType == GTR::eFxType::MOTIONBLUR)
+	{
+		FXShader->setUniform("u_depth_texture", alter_tex, 1);
+		FXShader->setUniform("u_intensity", 1.0f);
+
+	}
+	current_Tex->toViewport(FXShader);
+	fbo->unbind();
 }
 
 //Upload Deferred scene uniforms to the shader

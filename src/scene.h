@@ -182,6 +182,10 @@ namespace GTR {
 		bool light_model_trigger; //Triggers if light model has been changed.
 		bool buffer_range_trigger; //Triggers if the deferred buffer range has changed.
 
+		//FX properties
+		float contrast;
+		float saturation;
+		float vigneting;
 
 		//Input text buffer
 		const static int buffer_size = 25;

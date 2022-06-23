@@ -7,6 +7,15 @@ class Camera;
 
 namespace GTR {
 
+	enum eFxType {
+		GRAY = 0,
+		CONTRAST = 1,
+		BLUR1 = 2,
+		BLUR2 = 3,
+		MIX = 4,
+		MOTIONBLUR = 5
+	};
+
 	class Prefab;
 	class Material;
 
@@ -48,6 +57,12 @@ namespace GTR {
 
 		//Buffer range
 		int buffer_range = GL_UNSIGNED_BYTE;
+
+		//PostFx Textures
+		Texture* postTexA;
+		Texture* postTexB;
+		Texture* postTexC;
+		Texture* postTexD;
 
 		//Constructor
 		Renderer(Scene* scene, Camera* camera, int window_width, int window_height);
@@ -96,6 +111,11 @@ namespace GTR {
 		void computeDirectionalShadowMap(LightEntity* light, Camera* camera);
 		void renderDepthMap(RenderCall* rc, Camera* light_camera);
 		void showShadowAtlas();
+
+		//PostFx
+		void applyFx(Camera* camera, Texture* color_tex, Texture* depth_tex);
+		void loadFx(int FxType, FBO* fbo, Texture* current_Tex, Texture* alter_tex, char* shadername);
+		void InitPostFxTextures();
 
 	};
 

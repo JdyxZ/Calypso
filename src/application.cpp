@@ -359,6 +359,12 @@ void Application::renderDebugGUI(void)
 	//Background Color
 	ImGui::ColorEdit3("Background color", scene->background_color.v);
 
+	ImGui::Text("\nFX Properties");
+
+	ImGui::SliderFloat("Contrast", &scene->contrast, 0.0, 2.0);
+	ImGui::SliderFloat("Saturation", &scene->saturation, 0.0, 2.0);
+	ImGui::SliderFloat("Vigneting", &scene->vigneting, 0.0, 2.0);
+
 	//Scene entities
 	ImGui::Text("\nScene entities");
 

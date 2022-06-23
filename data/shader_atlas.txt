@@ -15,6 +15,14 @@ depth depth.vs color.fs
 linearize quad.vs linearize.fs
 linearize_atlas quad.vs linearize_atlas.fs
 
+//PostFX
+greyscale quad.vs greyscale.fs
+contrast quad.vs constrast.fs
+blur quad.vs blur.fs
+mix quad.vs mix.fs
+motionblur quad.vs motionblur.fs
+
+
 \normal_mapping
 
 mat3 cotangent_frame(in vec3 N, in vec3 p, in vec2 uv)
@@ -1055,3 +1063,145 @@ void main()
 {
 	FragColor = u_color;
 }
+
+\greyscale.fs
+
+#version 330 core
+
+in vec2 v_uv;
+
+uniform sampler2D u_texture;
+
+uniform float u_saturation;
+uniform float u_vigneting;
+
+layout(location = 0) out vec4 FragColor;
+
+void main()
+{
+	vec2 uv = v_uv;
+	vec4 color = texture(u_texture, uv);
+
+	color.xyz = vec3((color.x + color.y + color.z)/3.0); 
+
+	FragColor = color;
+}
+
+\contrast.fs
+
+#version 330 core
+
+in vec2 v_uv;
+
+uniform sampler2D u_texture;
+uniform float u_contrast;
+
+layout(location = 0) out vec4 FragColor;
+
+void main()
+{
+	vec2 uv = v_uv;
+	vec4 color = texture(u_texture, uv);
+
+	color.xyz = vec3((color.x + color.y + color.z)/3.0); 
+
+	FragColor = color;
+}
+
+
+\blur.fs
+
+#version 330 core
+
+//linear blur shader of 9 samples
+precision highp float;
+
+varying vec2 v_uv;
+
+uniform sampler2D u_texture;
+
+uniform vec2 u_offset;
+uniform float u_intensity;
+
+void main() {
+
+   vec4 sum = vec4(0.0);
+
+   sum += texture2D(u_texture, v_uv + u_offset * -4.0) * 0.05/0.98;
+   sum += texture2D(u_texture, v_uv + u_offset * -3.0) * 0.09/0.98;
+   sum += texture2D(u_texture, v_uv + u_offset * -2.0) * 0.12/0.98;
+   sum += texture2D(u_texture, v_uv + u_offset * -1.0) * 0.15/0.98;
+   sum += texture2D(u_texture, v_uv) * 0.16/0.98;
+   sum += texture2D(u_texture, v_uv + u_offset * 4.0) * 0.05/0.98;
+   sum += texture2D(u_texture, v_uv + u_offset * 3.0) * 0.09/0.98;
+   sum += texture2D(u_texture, v_uv + u_offset * 2.0) * 0.12/0.98;
+   sum += texture2D(u_texture, v_uv + u_offset * 1.0) * 0.15/0.98;
+
+   gl_FragColor = u_intensity * sum;
+
+}
+
+\mix.fs
+
+#version 330 core
+
+in vec2 v_uv;
+
+uniform sampler2D u_texture;
+uniform sampler2D u_textureB;
+uniform float u_intensity;
+
+void main()
+{
+	vec2 uv = v_uv;
+	vec4 colorA = texture2D(u_texture, uv);
+	vec4 colorB = texture2D(u_textureB, uv);
+
+	gl_FragColor = colorA * u_intensity + colorB;
+}
+
+\motionblur.fs
+
+#version 330 core
+
+in vec2 v_uv;
+
+uniform sampler2D u_texture;
+uniform sampler2D u_depth_texture;
+uniform mat4 u_viewprojection_old;
+uniform mat4 u_inverse_viewprojection;
+
+uniform float u_intensity;
+
+void main()
+{
+	vec2 uv = v_uv;
+
+	float depth = texture2D( u_depth_texture, uv ).x;
+
+	//Compute world position
+	vec4 screen_pos = vec4(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 world_position = proj_worldpos.xyz / proj_worldpos.w;
+
+	vec4 old_pos2d= u_viewprojection_old * vec4(world_position, 1.0);
+	old_pos2d.xyz /= old_pos2d.w;
+	vec2 uv2 = old_pos2d.xy * 0.5 + vec2(0.5);
+
+	vec4 color = vec4(0.0); 
+
+	const int SAMPLES = 16;
+
+	for(int i = 0; i < SAMPLES; ++i)
+	{
+		float f = float(i) / float(SAMPLES);
+		vec2 interpolated_uv = mix(uv, uv2, f);
+
+		color+= texture2D(u_texture, interpolated_uv);
+	}
+
+	color /= float(SAMPLES);
+
+	gl_FragColor = color;
+}
+
