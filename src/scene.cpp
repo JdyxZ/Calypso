@@ -29,7 +29,7 @@ GTR::Scene::Scene()
 	light_model = Scene::Phong;
 	diffuse_reflection = Scene::Lambert;
 	smith_aproximation = Scene::G1; 
-	light_pass = Scene::Singlepass;
+	light_pass = Scene::Multipass;
 
 	//Shadows
 	shadow_atlas = NULL;

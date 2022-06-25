@@ -725,19 +725,27 @@ void GTR::Renderer::applyFx(Camera* camera, Texture* color_tex, Texture* depth_t
 
 	//first FX
 	FBO* fbo = Texture::getGlobalFBO(postTexA);
-	loadFx(GRAY, fbo, current_tex, postTexC, "grayscale");
+	Shader* FXShader = Shader::Get("greyscale");
+	FXShader->enable();
+	FXShader->setUniform("u_saturation", &scene->saturation);
+	FXShader->setUniform("u_vigneting", &scene->vigneting);
+	current_tex->toViewport(FXShader);
+	fbo->unbind();
+	current_tex = postTexA;
 	std::swap(postTexA, postTexB);
 	//second FX
-	fbo = Texture::getGlobalFBO(postTexA);
-	loadFx(CONTRAST, fbo, current_tex, postTexC, "contrast");
-	std::swap(postTexA, postTexB);
-	//third FX
-	fbo = Texture::getGlobalFBO(postTexA);
-	loadFx(BLUR1, fbo, current_tex, postTexC, "blur");
-	std::swap(postTexA, postTexB);
+	//fbo = Texture::getGlobalFBO(postTexA);
+	//loadFx(CONTRAST, fbo, current_tex, postTexC, "contrast");
+	//current_tex = postTexA;
+	//std::swap(postTexA, postTexB);
+	////third FX
+	//fbo = Texture::getGlobalFBO(postTexA);
+	//loadFx(BLUR1, fbo, current_tex, postTexC, "blur");
+	//current_tex = postTexA;
+	//std::swap(postTexA, postTexB);
 
 	//fourth FX
-	fbo = Texture::getGlobalFBO(postTexA);
+	/*fbo = Texture::getGlobalFBO(postTexA);
 	loadFx(BLUR2, fbo, current_tex, postTexC, "blur");
 	std::swap(postTexA, postTexB);
 
@@ -749,7 +757,7 @@ void GTR::Renderer::applyFx(Camera* camera, Texture* color_tex, Texture* depth_t
 	//sixth FX
 	fbo = Texture::getGlobalFBO(postTexA);
 	loadFx(MOTIONBLUR, fbo, current_tex, gbuffers_fbo->depth_texture, "motionblur");
-	std::swap(postTexA, postTexB);
+	std::swap(postTexA, postTexB);*/
 
 
 	//show on screen
@@ -760,7 +768,6 @@ void GTR::Renderer::loadFx(int FxType, FBO* fbo, Texture* current_Tex, Texture* 
 {
 	fbo->bind();
 	Shader* FXShader = Shader::Get(shadername);
-	std::cout << shadername << std::endl;
 	FXShader->enable();
 	if (FxType == GTR::eFxType::GRAY)
 	{
