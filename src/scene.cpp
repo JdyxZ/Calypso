@@ -62,6 +62,9 @@ GTR::Scene::Scene()
 	contrast = 1.0;
 	saturation = 1.0;
 	vigneting = 0.0;
+	threshold = 0.9;
+	debug1 = 1.0;
+	debug2 = 1.0;
 	
 }
 

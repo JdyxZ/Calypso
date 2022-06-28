@@ -361,9 +361,12 @@ void Application::renderDebugGUI(void)
 
 	ImGui::Text("\nFX Properties");
 
+	ImGui::SliderFloat("Intensity", &scene->debug1, 0.0, 2.0);
+	ImGui::SliderFloat("Glow Power", &scene->debug2, 0.0, 2.0);
 	ImGui::SliderFloat("Contrast", &scene->contrast, 0.0, 2.0);
 	ImGui::SliderFloat("Saturation", &scene->saturation, 0.0, 2.0);
 	ImGui::SliderFloat("Vigneting", &scene->vigneting, 0.0, 2.0);
+	ImGui::SliderFloat("Threshold", &scene->threshold, 0.0, 2.0);
 
 	//Scene entities
 	ImGui::Text("\nScene entities");

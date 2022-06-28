@@ -723,41 +723,81 @@ void GTR::Renderer::applyFx(Camera* camera, Texture* color_tex, Texture* depth_t
 {
 	Texture* current_tex = color_tex;
 
+	//Function to load and apply the PostFX.
+	
 	//first FX
 	FBO* fbo = Texture::getGlobalFBO(postTexA);
+	fbo->bind();
 	Shader* FXShader = Shader::Get("greyscale");
 	FXShader->enable();
-	FXShader->setUniform("u_saturation", &scene->saturation);
-	FXShader->setUniform("u_vigneting", &scene->vigneting);
+	FXShader->setUniform("u_saturation", scene->saturation);
+	FXShader->setUniform("u_vigneting", scene->vigneting);
 	current_tex->toViewport(FXShader);
 	fbo->unbind();
 	current_tex = postTexA;
 	std::swap(postTexA, postTexB);
-	//second FX
-	//fbo = Texture::getGlobalFBO(postTexA);
-	//loadFx(CONTRAST, fbo, current_tex, postTexC, "contrast");
-	//current_tex = postTexA;
-	//std::swap(postTexA, postTexB);
-	////third FX
-	//fbo = Texture::getGlobalFBO(postTexA);
-	//loadFx(BLUR1, fbo, current_tex, postTexC, "blur");
-	//current_tex = postTexA;
-	//std::swap(postTexA, postTexB);
 
-	//fourth FX
-	/*fbo = Texture::getGlobalFBO(postTexA);
-	loadFx(BLUR2, fbo, current_tex, postTexC, "blur");
-	std::swap(postTexA, postTexB);
+	//second FX
+	fbo = Texture::getGlobalFBO(postTexC);
+	fbo->bind();
+	FXShader = Shader::Get("contrast");
+	FXShader->enable();
+	FXShader->setUniform("u_contrast", scene->contrast);
+	current_tex->toViewport(FXShader);
+	fbo->unbind();
+	current_tex = postTexC;
+
+	fbo = Texture::getGlobalFBO(postTexD);
+	fbo->bind();
+	FXShader = Shader::Get("threshold");
+	FXShader->enable();
+	FXShader->setUniform("u_threshold", scene->threshold);
+	current_tex->toViewport(FXShader);
+	fbo->unbind();
+	current_tex = postTexD;
+
+	for (int i = 0; i < 8; i++)
+	{
+		//third FX
+		fbo = Texture::getGlobalFBO(postTexA);
+		//loadFx(BLUR1, fbo, current_tex, postTexC, "blur");
+		fbo->bind();
+		FXShader = Shader::Get("blur");
+		FXShader->enable();
+		FXShader->setUniform("u_offset", vec2( (pow(1.0,i) / current_tex->width) , 0.0) * scene->debug1);
+		FXShader->setUniform("u_intensity", 1.0f);
+		current_tex->toViewport(FXShader);
+		fbo->unbind();
+
+		//fourth FX
+		fbo = Texture::getGlobalFBO(postTexB);
+		//loadFx(BLUR1, fbo, current_tex, postTexC, "blur");
+		fbo->bind();
+		FXShader = Shader::Get("blur");
+		FXShader->enable();
+		FXShader->setUniform("u_offset", vec2(0.0, (pow(1.0, i) / current_tex->height)) * scene->debug1);
+		FXShader->setUniform("u_intensity", 1.0f);
+		postTexA->toViewport(FXShader);
+		fbo->unbind();
+		current_tex = postTexB;
+	}
 
 	//fifth FX
 	fbo = Texture::getGlobalFBO(postTexA);
-	loadFx(MIX, fbo, current_tex, postTexC, "mix");
+	fbo->bind();
+	FXShader = Shader::Get("mix");
+	FXShader->enable();
+	FXShader->setUniform("u_intensity", scene->debug2);
+	FXShader->setUniform("u_textureB", postTexC, 1);
+	current_tex->toViewport(FXShader);
+	fbo->unbind();
+	current_tex = postTexA;
 	std::swap(postTexA, postTexB);
 
-	//sixth FX
-	fbo = Texture::getGlobalFBO(postTexA);
-	loadFx(MOTIONBLUR, fbo, current_tex, gbuffers_fbo->depth_texture, "motionblur");
-	std::swap(postTexA, postTexB);*/
+	////sixth FX
+	//fbo = Texture::getGlobalFBO(postTexA);
+	//loadFx(MOTIONBLUR, fbo, current_tex, gbuffers_fbo->depth_texture, "motionblur");
+	//std::swap(postTexA, postTexB);
 
 
 	//show on screen

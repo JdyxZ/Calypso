@@ -186,6 +186,9 @@ namespace GTR {
 		float contrast;
 		float saturation;
 		float vigneting;
+		float threshold;
+		float debug1;
+		float debug2;
 
 		//Input text buffer
 		const static int buffer_size = 25;
