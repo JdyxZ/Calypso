@@ -55,7 +55,7 @@ void::Renderer::renderSkybox(Camera* camera)
 
 	Matrix44 model;
 
-	model.scale(100, 100, 100);
+	model.scale(10, 10, 10);
 
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
