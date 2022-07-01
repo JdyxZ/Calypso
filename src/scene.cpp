@@ -282,6 +282,15 @@ bool GTR::Scene::save()
 
 				break;
 			}
+			case (DECAL):
+			{
+				DecalEntity* decal = (DecalEntity*)entity;
+				writeJSONString(new_entity, "name", decal->name);
+				writeJSONString(new_entity, "type", "DECAL");
+				writeJSONString(new_entity, "filename", decal->texture->filename);
+				writeJSONFloatVector(new_entity, "model", decal->model.m, 16);
+				break;
+			}
 		}
 		
 		//Add the new entity to the list of entities
@@ -439,8 +448,12 @@ GTR::DecalEntity::DecalEntity(){
 }
 
 void GTR::DecalEntity::configure(cJSON* json) {
-	if (cJSON_GetObjectItem(json, "texture"))
-		texture = cJSON_GetObjectItem(json, "texture")->valuestring;
+	if (cJSON_GetObjectItem(json, "texture")) {
+		std::string filename = cJSON_GetObjectItem(json, "texture")->valuestring;
+		if (!filename.empty())
+			texture = Texture::Get(filename.c_str());
+
+	}
 }
 
 GTR::LightEntity::LightEntity()

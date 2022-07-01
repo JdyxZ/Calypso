@@ -3,13 +3,13 @@
 
 #include "framework.h"
 #include "camera.h"
+#include "texture.h"
 #include <string>
 #include <map>
 
 //forward declaration
 class cJSON; 
 class FBO;
-class Texture;
 
 
 //our namespace
@@ -101,7 +101,7 @@ namespace GTR {
 	class DecalEntity : public GTR::BaseEntity
 	{
 	public:
-		std::string texture;
+		Texture* texture;
 
 		DecalEntity();
 		virtual void renderInMenu() {};

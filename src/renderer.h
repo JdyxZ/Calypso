@@ -38,6 +38,8 @@ namespace GTR {
 
 	public:
 
+		Renderer();
+
 		//Application variables
 		Scene* scene;
 		Camera* camera;
@@ -55,6 +57,8 @@ namespace GTR {
 		FBO* ssao_fbo;
 		FBO* ssao_p_fbo;
 		FBO* volumetric_fbo;
+
+		Texture* skybox;
 
 		//Render variables
 		std::vector<LightEntity*> lights; //Here we store each Light to be sent to the Shadder.
@@ -134,6 +138,9 @@ namespace GTR {
 		void computeDirectionalShadowMap(LightEntity* light, Camera* camera);
 		void renderDepthMap(RenderCall* rc, Camera* light_camera);
 		void showShadowAtlas();
+
+		//Reflections
+		void renderSkybox(Camera* camera);
 
 		//VOlumetricLight
 		void InitVolumetric();

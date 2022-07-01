@@ -42,6 +42,31 @@ bool sortLight(const LightEntity* l1, const LightEntity* l2)
 
 //<--------------------------------------------------- Constructor --------------------------------------------------->
 
+GTR::Renderer::Renderer()
+{
+	skybox = CubemapFromHDRE("data/night.hdre");
+}
+
+void::Renderer::renderSkybox(Camera* camera) 
+{
+	Mesh* mesh = Mesh::Get("data/meshes/sphere.obj",true);
+	Shader* shader = Shader::Get("skybox");
+	shader->enable();
+
+	Matrix44 model;
+
+	model.scale(100, 100, 100);
+
+	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	shader->setUniform("u_camera_position", camera->eye);
+	shader->setUniform("u_model", model);
+	shader->setTexture("u_texture", skybox, 0);
+
+
+	mesh->render(GL_TRIANGLES);
+	shader->disable();
+}
+
 Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_height)
 {
 	//Set current scene and camera
@@ -783,7 +808,7 @@ void GTR::Renderer::DecalsFBO() {
 	{
 		DecalEntity* decal = decals[i];
 		shader->setUniform("u_model", decal->model);
-		Texture* decal_tex = Texture::Get(decal->texture.c_str());
+		Texture* decal_tex = decal->texture;
 		if (!decal_tex)
 			continue;
 		shader->setTexture("u_decal_texture", decal_tex, 5);

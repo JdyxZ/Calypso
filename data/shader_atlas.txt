@@ -25,6 +25,9 @@ decal pixel.vs decal.fs
 //Volumetric
 volumetric quad.vs volumetric.fs
 
+//Reflection
+skybox pixel.vs skybox.fs
+
 //PostFX
 greyscale quad.vs greyscale.fs
 contrast quad.vs contrast.fs
@@ -1201,7 +1204,7 @@ if( localpos.x < -0.5 || localpos.x > 0.5 ||
 
 
 	vec2 decal_uv = localpos.xz + vec2(0.5);
-	
+
 	//vec4 color = vec4(localpos.xyz, 1.0);
 	vec4 color = texture(u_decal_texture, decal_uv);
 
@@ -1321,6 +1324,31 @@ void main()
 	FragColor = vec4(irradiance, transparency);
 }
 
+\skybox.fs
+
+#version 330 core
+
+//Interpolated variables
+in vec2 v_uv;
+in vec3 v_position;
+in vec3 v_world_position;
+
+
+//Textures
+uniform samplerCube u_texture;
+
+//Scene uniforms
+uniform mat4 u_model;
+uniform mat4 u_viewprojection;
+uniform vec3 u_camera_position;
+
+out vec4 FragColor;
+
+void main()
+{
+	vec3 V = v_world_position - u_camera_position;
+	FragColor = texture(u_texture, V);
+}
 
 
 \emissive.fs
