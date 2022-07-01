@@ -732,22 +732,33 @@ void GTR::Renderer::InitVolumetric() {
 	}
 
 	//Start rendering inside the illumination fbo
+	Vector2 i_Res = Vector2(1.0 / (float)volumetric_fbo->color_textures[0]->width, 1.0 / (float)volumetric_fbo->color_textures[0]->height);
+	Matrix44 inv_camera_vp = camera->viewprojection_matrix;
+	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
+	Mesh* quad;
 	volumetric_fbo->bind();
-
 	Shader* shader = Shader::Get("volumetric");
-
+	shader->setUniform("u_camera_position", camera->eye);
 	shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
+	//shader->setUniform("u_air_density", 0.0001);
 	shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
 	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
-	if (scene->SSAO_type == SSAOType::SSAOp)
-	{
-		shader->setTexture("u_ssao_texture", ssao_p_fbo->color_textures[0], 4);
-	}
-	else {
-		shader->setTexture("u_ssao_texture", ssao_fbo->color_textures[0], 4);
-	}
-	direct_light.
-	Mesh* quad;
+	//Scene uniforms
+	shader->setUniform("u_light_model", direct_light->model);
+	shader->setUniform("u_diffuse_reflection", scene->diffuse_reflection);
+	shader->setUniform("u_geometry_shadowing", scene->smith_aproximation);
+	shader->setUniform("u_light_pass", scene->light_pass);
+	shader->setUniform("u_gamma_correction", scene->gamma_correction);
+	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	shader->setUniform("u_camera_position", camera->eye);
+	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_occlusion", scene->occlusion);
+	shader->setUniform("u_specular_light", scene->specular_light);
+	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	shader->setVector3("u_directional_front", direct_light->model.rotateVector(Vector3(0, 0, -1)));
+	shader->setUniform("u_area_size", direct_light->area_size);
+	shader->setUniform("u_light_type", 2);
 
 	quad->render(GL_TRIANGLES);
 	

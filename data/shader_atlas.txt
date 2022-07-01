@@ -1140,6 +1140,84 @@ void main()
 	GB2 = vec4(omr,emissive_color.z);
 }
 
+\volumetric.fs
+
+
+
+#version 330 core
+
+//Interpolated variables
+in vec2 v_uv;
+
+//Textures
+uniform sampler2D u_depth_texture;
+
+//Scene uniforms
+uniform mat4 u_viewprojection;
+uniform mat4 u_inverse_viewprojection;
+uniform vec2 u_iRes;
+uniform vec3 u_camera_position;
+
+//Output
+layout(location = 0) out vec3 I0;
+layout(location = 1) out vec3 I1;
+
+out vec4 FragColor;
+
+const int SAMPLES = 64;
+
+void main()
+{
+	//Extract uvs from pixel screenpos
+	vec2 uv = gl_FragCoord.xy * u_iRes;
+	//compute world position from pixel depth
+	float depth = texture( u_depth_texture, uv ).x;
+
+	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 worldpos = proj_worldpos.xyz / proj_worldpos.w;
+
+	vec3 color = vec3(0.0);
+
+	//compute ray info
+	vec3 ray_start = u_camera_position;
+	vec3 ray_dir = ( worldpos - ray_start );
+	float ray_length = length(ray_dir);
+	ray_dir /= ray_length;
+	ray_dir = normalize(ray_dir);
+	ray_length = min( 500.0, ray_length ); //max ray
+
+	float step_dist = ray_length / float(SAMPLES);
+	vec3 current_pos = ray_start;
+	vec3 ray_offset = ray_dir * step_dist;
+
+	//how visible is the point at the end of the ray
+	float transparency = 1.0;
+	//how much transparency gets removed per world unit of the ray
+	float air_density = 0.001;
+
+
+	for(int i = 0; i < SAMPLES; ++i)
+	{
+		//evaluate contribution
+		//...
+
+		//reduce visibility
+		transparency -= air_density * step_dist;
+
+		//too dense, nothing can be seen behind
+		if( transparency < 0.001 )
+			break;
+		//advance to next position
+		current_pos.xyz += ray_offset;
+	}
+
+
+
+	FragColor = vec4(color, 1.0)
+}
+
+
 
 \emissive.fs
 
