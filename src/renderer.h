@@ -46,11 +46,18 @@ namespace GTR {
 		FBO* shadow_fbo;
 		FBO* gbuffers_fbo;
 		FBO* illumination_fbo;
+		FBO* ssao_fbo;
+		FBO* ssao_p_fbo;
+		FBO* volumetric_fbo;
 
 		//Render variables
 		std::vector<LightEntity*> lights; //Here we store each Light to be sent to the Shadder.
 		std::vector<RenderCall*> render_calls; // Here we store each RenderCall to be sent to the Shadder.
 		std::vector<RenderCall*> transparent_objects; //Here we store the RenderCalls of the objects that need blending (for Deferred pipeline)
+
+		//SSAO
+		std::vector<Vector3> rand_points_ssao;
+		std::vector<Vector3> rand_points_ssao_p;
 
 		//Shadow Resolution
 		int shadow_map_resolution = 2048; //Default Resolution
@@ -58,11 +65,15 @@ namespace GTR {
 		//Buffer range
 		int buffer_range = GL_UNSIGNED_BYTE;
 
+		//Decals
+		Texture* cloned_depth_texture;
+
 		//PostFx Textures
 		Texture* postTexA;
 		Texture* postTexB;
 		Texture* postTexC;
 		Texture* postTexD;
+		Matrix44 mvp_last;
 
 		//Constructor
 		Renderer(Scene* scene, Camera* camera, int window_width, int window_height);
@@ -91,6 +102,9 @@ namespace GTR {
 		void GBuffers();
 		void clearGBuffers();
 		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera);
+		void SSAO();
+		void getssaoBlur();
+		void renderSSAO(std::vector<Vector3> rand_points);
 		void IlluminationNTransparencies();
 		void clearIlluminationBuffers();
 		void renderDeferredIllumination();
@@ -121,5 +135,8 @@ namespace GTR {
 
 	//Cubemap
 	Texture* CubemapFromHDRE(const char* filename);
+
+	//SpherePoints
+	std::vector<Vector3> generateSpherePoints(int num, float radius, bool hemi);
 
 };

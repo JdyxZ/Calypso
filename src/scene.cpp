@@ -58,6 +58,11 @@ GTR::Scene::Scene()
 	light_model_trigger = false;
 	buffer_range_trigger = false;
 
+	//SSAO debugging
+	show_ssao = false;
+	show_ssaop = false;
+	SSAO_type = SSAOType::SSAO;
+
 	//FX properties
 	contrast = 1.0;
 	saturation = 1.0;

@@ -23,6 +23,11 @@ namespace GTR {
 		DECALL = 5
 	};
 
+	enum SSAOType {
+		SSAO = 0,
+		SSAOp = 1,
+	};
+
 	enum LightType {
 		POINT = 0,
 		SPOT = 1,
@@ -166,6 +171,11 @@ namespace GTR {
 		bool show_buffers;
 		bool toggle_buffers;
 		BufferRange buffer_range;
+
+		//SSAO
+		bool show_ssao;
+		bool show_ssaop;
+		SSAOType SSAO_type;
 
 		//Color correction
 		bool gamma_correction; // Show the difference between working in linear space and reconverting to gamma space and only work in gamma space.

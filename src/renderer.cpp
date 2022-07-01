@@ -52,6 +52,11 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	shadow_fbo = NULL;
 	gbuffers_fbo = NULL;
 	illumination_fbo = NULL;
+	ssao_fbo = NULL;
+	ssao_p_fbo = NULL;
+
+	rand_points_ssao = generateSpherePoints(64, 1, false);
+	rand_points_ssao_p = generateSpherePoints(64, 1, true);
 
 	//PostFx Tex
 	postTexA = NULL;
@@ -676,6 +681,8 @@ void GTR::Renderer::renderDeferred()
 
 	//Create and render the GBuffers
 	GBuffers();
+
+	SSAO();
 	//Illumination and transparencies
 	IlluminationNTransparencies();
 
@@ -722,9 +729,13 @@ void GTR::Renderer::InitPostFxTextures()
 void GTR::Renderer::applyFx(Camera* camera, Texture* color_tex, Texture* depth_tex) 
 {
 	Texture* current_tex = color_tex;
+	Vector2 i_Res = Vector2(1.0 / window_size.x, 1.0 / window_size.y);
+	Matrix44 inv_camera_vp = camera->viewprojection_matrix;
+	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
 
-	//Function to load and apply the PostFX.
+	//Function to load and apply the PostFX. 
 	
+
 	//first FX
 	FBO* fbo = Texture::getGlobalFBO(postTexA);
 	fbo->bind();
@@ -756,7 +767,7 @@ void GTR::Renderer::applyFx(Camera* camera, Texture* color_tex, Texture* depth_t
 	fbo->unbind();
 	current_tex = postTexD;
 
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < 16; i++)
 	{
 		//third FX
 		fbo = Texture::getGlobalFBO(postTexA);
@@ -794,10 +805,21 @@ void GTR::Renderer::applyFx(Camera* camera, Texture* color_tex, Texture* depth_t
 	current_tex = postTexA;
 	std::swap(postTexA, postTexB);
 
-	////sixth FX
-	//fbo = Texture::getGlobalFBO(postTexA);
-	//loadFx(MOTIONBLUR, fbo, current_tex, gbuffers_fbo->depth_texture, "motionblur");
-	//std::swap(postTexA, postTexB);
+	//MotionBlur
+	/*fbo = Texture::getGlobalFBO(postTexA);
+	fbo->bind();
+	FXShader = Shader::Get("motionblur");
+	FXShader->enable();
+	FXShader->setUniform("u_depth_texture", gbuffers_fbo->depth_texture, 1);
+	FXShader->setUniform("u_viewprojection_old", mvp_last);
+	FXShader->setUniform("u_inverse_viweprojection", inv_camera_vp);
+	FXShader->setUniform("u_iRes", i_Res);
+	current_tex->toViewport(FXShader);
+	fbo->unbind();
+	current_tex = postTexA;
+	std::swap(postTexA, postTexB);
+
+	mvp_last = camera->viewprojection_matrix;*/
 
 
 	//show on screen
@@ -837,8 +859,6 @@ void GTR::Renderer::loadFx(int FxType, FBO* fbo, Texture* current_Tex, Texture* 
 	}
 	else if (FxType == GTR::eFxType::MOTIONBLUR)
 	{
-		FXShader->setUniform("u_depth_texture", alter_tex, 1);
-		FXShader->setUniform("u_intensity", 1.0f);
 
 	}
 	current_Tex->toViewport(FXShader);
@@ -876,6 +896,13 @@ void GTR::Renderer::setDeferredSceneUniforms(Shader* shader)
 	shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
 	shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
 	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+	if (scene->SSAO_type == SSAOType::SSAOp)
+	{
+		shader->setTexture("u_ssao_texture", ssao_p_fbo->color_textures[0], 4);
+	}
+	else {
+		shader->setTexture("u_ssao_texture", ssao_fbo->color_textures[0], 4);
+	}
 }
 
 //GBuffers
@@ -948,6 +975,20 @@ void GTR::Renderer::GBuffers()
 
 	//Stop rendering to the gbuffers fbo
 	gbuffers_fbo->unbind();
+
+	////allocate memory for the cloned depth texture
+	//if (!cloned_depth_texture)
+	//	cloned_depth_texture = new Texture();
+
+
+	////copy gbuffers depth to other texture
+	//gbuffers_fbo->depth_texture->copyTo(cloned_depth_texture);
+
+	////draw again inside the gbuffers
+	//gbuffers_fbo->bind();
+
+	////but pass to the shader the cloned depth
+	//shader->setUniform("u_depth_texture", cloned_depth_texture);
 }
 
 //We clear in several passes so we can control the clear color independently for every gbuffer
@@ -1037,6 +1078,140 @@ void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camer
 	//Set the render state as it was before to avoid problems with future renders
 	glDisable(GL_CULL_FACE);
 
+}
+
+void GTR::Renderer::SSAO() {
+	if (scene->SSAO_type == SSAOType::SSAO) {
+		/*
+
+		   SSAO
+
+		 */
+		 //Crete the ssao fbo if they don't exist yet
+		if (!ssao_fbo || scene->resolution_trigger)
+		{
+			if (ssao_fbo)
+			{
+				delete ssao_fbo;
+				ssao_fbo = NULL;
+			}
+			//Create a new FBO
+			ssao_fbo = new FBO();
+
+			//Create three textures of four components
+			ssao_fbo->create(window_size.x, window_size.y,
+				3,                     //three textures
+				GL_RGBA,             //four channels
+				GL_UNSIGNED_BYTE,    //1 byte
+				false);                //add depth_texture
+
+		}
+
+		//Start rendering inside the ssao fbo
+		ssao_fbo->bind();
+
+		//Clear all buffers
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
+
+		renderSSAO(rand_points_ssao);
+
+
+		//Stop rendering to the ssao fbo
+		ssao_fbo->unbind();
+	}
+	else {
+		/*
+
+		   SSAO+
+
+		*/
+		//Crete the ssao fbo if they don't exist yet
+		if (!ssao_p_fbo || scene->resolution_trigger)
+		{
+			if (ssao_p_fbo)
+			{
+				delete ssao_p_fbo;
+				ssao_p_fbo = NULL;
+			}
+			//Create a new FBO
+			ssao_p_fbo = new FBO();
+
+			//Create three textures of four components
+			ssao_p_fbo->create(window_size.x, window_size.y,
+				3,                     //three textures
+				GL_RGBA,             //four channels
+				GL_UNSIGNED_BYTE,    //1 byte
+				false);                //add depth_texture
+
+		}
+
+		//Start rendering inside the ssao fbo
+		ssao_p_fbo->bind();
+
+		//Clear all buffers
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
+
+		renderSSAO(rand_points_ssao_p);
+
+
+		//Stop rendering to the ssao fbo
+		ssao_p_fbo->unbind();
+	}
+}
+
+void GTR::Renderer::getssaoBlur() {
+	//Get the shader
+	
+	//maybe we want to create also one for the blur, in this case just create a texture
+	for (int i = 0; i < 16; i++)
+	{
+		Texture* ssao_blur = new Texture();
+		ssao_blur->create(window_size.x, window_size.y);
+		Shader* shader = Shader::Get("blur");
+		shader->enable();
+		shader->setUniform("u_offset", vec2((pow(1.0, i) / ssao_p_fbo->color_textures[0]->width), 0.0) * scene->debug1);
+		shader->setUniform("u_intensity", 1.0f);
+		shader->setTexture("u_ssao_texture", ssao_p_fbo->color_textures[0], 0);
+		ssao_blur->toViewport(shader);
+		shader->disable();
+	}
+}
+
+void GTR::Renderer::renderSSAO(std::vector<Vector3> rand_points) {
+
+	Mesh* quad = Mesh::getQuad();
+	Matrix44 inv_vp = camera->viewprojection_matrix;
+	inv_vp.inverse();
+
+
+	Vector3 rpoints[64];
+	for (int i = 0; i < rand_points.size(); i++)
+	{
+		rpoints[i] = rand_points[i];
+	}
+
+	Shader* shader;
+	if (scene->SSAO_type == SSAOType::SSAOp) {
+		getssaoBlur();
+		shader = Shader::Get("ssaop");
+
+	}
+	else if (scene->SSAO_type == SSAOType::SSAO) {
+		shader = Shader::Get("ssao");
+	}
+
+	shader->enable();
+
+	shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 0);
+	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 1);
+	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
+	shader->setUniform("u_inverse_viewprojection", inv_vp);
+	shader->setUniform("u_iRes", Vector2(1.0 / (float)window_size.x, 1.0 / (float)window_size.y));
+	shader->setUniform3Array("u_points", (float*)&rpoints[0], rand_points.size());
+
+	quad->render(GL_TRIANGLES);
 }
 
 //Computes illumination and transparent objects
@@ -1766,3 +1941,30 @@ Texture* GTR::CubemapFromHDRE(const char* filename)
 		}
 	return texture;
 }
+
+// <--------------------------------------------------- SpherePoints --------------------------------------------------->
+std::vector<Vector3> GTR::generateSpherePoints(int num, float radius, bool hemi)
+{
+	std::vector<Vector3> points;
+	points.resize(num);
+	for (int i = 0; i < num; i += 1)
+	{
+		Vector3& p = points[i];
+		float u = random();
+		float v = random();
+		float theta = u * 2.0 * PI;
+		float phi = acos(2.0 * v - 1.0);
+		float r = cbrt(random() * 0.9 + 0.1) * radius;
+		float sinTheta = sin(theta);
+		float cosTheta = cos(theta);
+		float sinPhi = sin(phi);
+		float cosPhi = cos(phi);
+		p.x = r * sinPhi * cosTheta;
+		p.y = r * sinPhi * sinTheta;
+		p.z = r * cosPhi;
+		if (hemi && p.z < 0)
+			p.z *= -1.0;
+	}
+	return points;
+}
+

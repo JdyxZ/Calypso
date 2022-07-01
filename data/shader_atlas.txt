@@ -10,6 +10,10 @@ emissive quad.vs emissive.fs
 deferred_illumination_sphere pixel.vs deferred.fs
 deferred_illumination_quad quad.vs deferred.fs
 
+//SSAO shader
+ssao quad.vs ssao.fs
+ssaop quad.vs ssaop.fs
+
 //Depth map shaders
 depth depth.vs color.fs
 linearize quad.vs linearize.fs
@@ -399,14 +403,14 @@ float computeLightAttenuation(in float light_distance, in float light_max_distan
 	return attenuation_factor;
 }
 
-vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in vec3 omr)
+vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in float ao_factor, const in vec3 albedo, const in vec3 omr)
 {
 	//Compute ambient factor
 	float ambient_factor = 1.0;
 	if(u_occlusion) ambient_factor = omr.x;
 
 	//Set ambient light to phong light
-	vec3 light = ambient_factor * u_ambient_light;
+	vec3 light = ambient_factor * u_ambient_light * ao_factor;
 
 	//Single pass for loop
 	for( int i = 0; i < MAX_LIGHTS; ++i )
@@ -510,14 +514,14 @@ vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in
 	return light;
 }
 
-vec3 Multipass(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in vec3 omr)
+vec3 Multipass(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in float ao_factor, const in vec3 albedo, const in vec3 omr)
 {
 	//Compute ambient factor
 	float ambient_factor = 1.0;
 	if(u_occlusion) ambient_factor = omr.x;
 
 	//Set ambient light to phong light
-	vec3 light = ambient_factor * u_ambient_light;
+	vec3 light = ambient_factor * u_ambient_light * ao_factor;
 
 	//Light intesity
 	float light_intensity = u_light_intensity;
@@ -744,6 +748,7 @@ void main()
 	vec3 tangent_space_normal = texture2D( u_normal_texture, v_uv ).xyz;
 	color *= degamma(texture2D( u_color_texture, v_uv ));	
 	vec3 omr = texture2D(u_omr_texture,v_uv).xyz;
+	float ao_factor = 1.0;
 
 	//Mask
 	if(color.a < u_alpha_cutoff)
@@ -764,11 +769,11 @@ void main()
 	vec3 light;
 	if(u_light_pass == 0) //Multi pass lighting
 	{
-		light = Multipass(normal_vector, view_vector, v_world_position, color.xyz, omr);
+		light = Multipass(normal_vector, view_vector, v_world_position, ao_factor, color.xyz, omr);
 	} 
 	else if(u_light_pass == 1) //Single pass lighting
 	{
-		light = Singlepass(normal_vector, view_vector, v_world_position, color.xyz, omr);
+		light = Singlepass(normal_vector, view_vector, v_world_position, ao_factor, color.xyz, omr);
 	} 
 	
 	//Final color
@@ -809,6 +814,7 @@ uniform sampler2D u_gb0_texture;
 uniform sampler2D u_gb1_texture;
 uniform sampler2D u_gb2_texture;
 uniform sampler2D u_depth_texture;
+uniform sampler2D u_ssao_texture;
 
 //Scene uniforms
 uniform int u_light_pass;
@@ -840,6 +846,8 @@ void main()
 	vec4 gb1 = texture2D( u_gb1_texture, uv );
 	vec4 gb2 = texture2D( u_gb2_texture, uv );
 	float depth = texture2D( u_depth_texture, uv ).x;
+	float ao_factor = texture2D( u_ssao_texture, uv ).x;	
+	ao_factor = smoothstep(0.5, 0.7, ao_factor);
 
 	//Discard background pixels
 	if(depth == 1.0)
@@ -865,11 +873,11 @@ void main()
 	vec3 light;
 	if(u_light_pass == 0) //Multi pass lighting
 	{
-		light = Multipass(normal_vector, view_vector, world_position, color.xyz, omr);
+		light = Multipass(normal_vector, view_vector, world_position, ao_factor,color.xyz, omr);
 	} 
 	else if(u_light_pass == 1) //Single pass lighting
 	{
-		light = Singlepass(normal_vector, view_vector, world_position, color.xyz, omr);
+		light = Singlepass(normal_vector, view_vector, world_position, ao_factor,color.xyz, omr);
 	} 
 
 	//Final color
@@ -884,6 +892,181 @@ void main()
 	I0 = gamma(color);
 	I1 = light;
 
+}
+
+
+\ssao.fs
+#version 330 core
+
+//Interpolated variables
+in vec2 v_uv;
+
+//Textures
+uniform sampler2D u_depth_texture;
+
+//Scene uniforms
+uniform mat4 u_viewprojection;
+uniform mat4 u_inverse_viewprojection;
+uniform vec2 u_iRes;
+uniform vec3 u_points[64];
+
+//Output
+layout(location = 0) out vec3 I0;
+layout(location = 1) out vec3 I1;
+
+out vec4 FragColor;
+
+void main()
+{
+	//Extract uvs from pixel screenpos
+	vec2 uv = gl_FragCoord.xy * u_iRes;
+
+	//read depth from depth buffer
+	float depth = texture( u_depth_texture, uv ).x;
+
+	//ignore pixels in the background
+	if(depth >= 1.0)
+	{
+		FragColor = vec4(1.0);
+		return;
+	}
+
+	//Compute world position
+	vec4 screen_pos = vec4(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 world_position = proj_worldpos.xyz / proj_worldpos.w;
+	
+	//lets use 64 samples
+	const int samples = 64;
+	int num = samples; //num samples that passed the are outside
+
+	//for every sample around the point
+	for( int i = 0; i < samples; ++i )
+	{
+		//compute is world position using the random
+		vec3 delta = u_points[i] * 10.0;
+		vec3 p = world_position + delta;
+
+		//find the uv in the depth buffer of this point
+		vec4 proj = u_viewprojection * vec4(p,1.0);
+		proj.xy /= proj.w; //convert to clipspace from homogeneous
+
+		//apply a tiny bias to its z before converting to clip-space
+		proj.z = (proj.z - 0.005) / proj.w;
+		proj.xyz = proj.xyz * 0.5 + vec3(0.5); //to [0..1]
+
+		//read p true depth
+		float pdepth = texture( u_depth_texture, proj.xy ).x;
+
+		//compare true depth with its depth
+		if( (proj.z - pdepth) > 0.0 && (proj.z - pdepth) < 0.001 ) //if true depth smaller, is inside
+			num--; //remove this point from the list of visible
+	}
+
+	//finally, compute the AO factor as the ratio of visible points
+	float ao = float(num) / float(samples);
+
+	FragColor = vec4(ao);
+}
+
+\ssaop.fs
+
+#version 330 core
+
+//Interpolated variables
+in vec2 v_uv;
+
+//Textures
+uniform sampler2D u_gb1_texture;
+uniform sampler2D u_depth_texture;
+
+//Scene uniforms
+uniform mat4 u_viewprojection;
+uniform mat4 u_inverse_viewprojection;
+uniform vec2 u_iRes;
+uniform vec3 u_points[64];
+
+//Output
+layout(location = 0) out vec3 I0;
+layout(location = 1) out vec3 I1;
+
+out vec4 FragColor;
+
+//includes
+#include normal_mapping
+
+vec3 rotateY (in float angle, in vec3 delta){
+	float s0 = sin(angle);
+	float c0 = cos(angle);
+
+	return vec3(delta.x * c0 - delta.z - s0, delta.y, delta.x * s0 + delta.z * c0);
+}
+
+void main()
+{
+	//Extract uvs from pixel screenpos
+	vec2 uv = gl_FragCoord.xy * u_iRes;
+
+	//read depth from depth buffer
+	vec4 gb1 = texture2D( u_gb1_texture, uv );
+	float depth = texture( u_depth_texture, uv ).x;
+
+	//ignore pixels in the background
+	if(depth >= 1.0)
+	{
+		FragColor = vec4(1.0);
+		return;
+	}
+
+	//Compute world position
+	vec4 screen_pos = vec4(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 world_position = proj_worldpos.xyz / proj_worldpos.w;	
+
+	//Assign each buffer value to its material property
+	vec3 normal_vector = (gb1.xyz * 2.0 - vec3(1.0)); //normals must be converted from 0..1 to -1..+1
+
+	//Renormalize normal in case of data loss
+	normal_vector = normalize(normal_vector);
+	
+	//lets use 64 samples
+	const int samples = 64;
+	int num = samples; //num samples that passed the are outside
+
+	//for every sample around the point
+	for( int i = 0; i < samples; ++i )
+	{
+		//to create the matrix33 to convert from tangent to world
+		mat3 rotmat = cotangent_frame( normal_vector, world_position, uv );
+
+		vec3 delta = rotmat * u_points[i] * 10;
+
+		//compute is world position using the random
+		//vec3 delta = u_points[i] * 10.0;
+		float angle = gl_FragCoord.x * 1238.93 + gl_FragCoord.y * 6812.32;
+		delta = rotateY(angle, delta);
+		vec3 p = world_position + delta ;
+
+		//find the uv in the depth buffer of this point
+		vec4 proj = u_viewprojection * vec4(p,1.0);
+		proj.xy /= proj.w; //convert to clipspace from homogeneous
+
+		//apply a tiny bias to its z before converting to clip-space
+		proj.z = (proj.z - 0.005) / proj.w;
+		proj.xyz = proj.xyz * 0.5 + vec3(0.5); //to [0..1]
+
+		//read p true depth
+		float pdepth = texture( u_depth_texture, proj.xy ).x;
+
+		//compare true depth with its depth
+		if( proj.z - pdepth > 0.0 && proj.z - pdepth < 0.001 ) //if true depth smaller, is inside
+			num--; //remove this point from the list of visible
+	}
+
+	//finally, compute the AO factor as the ratio of visible points
+	float ao = float(num) / float(samples);
+
+	FragColor = vec4(ao);
 }
 
 \gbuffers.fs
@@ -1163,7 +1346,7 @@ void main()
 	vec4 colorA = texture2D(u_texture, uv);
 	vec4 colorB = texture2D(u_textureB, uv);
 
-	gl_FragColor = (colorA * u_intensity) + colorB;
+	gl_FragColor = (colorA) + colorB* u_intensity;
 }
 
 
@@ -1204,12 +1387,11 @@ uniform sampler2D u_texture;
 uniform sampler2D u_depth_texture;
 uniform mat4 u_viewprojection_old;
 uniform mat4 u_inverse_viewprojection;
-
-uniform float u_intensity;
+uniform vec2 u_iRes;
 
 void main()
 {
-	vec2 uv = v_uv;
+	vec2 uv = gl_FragColor.xy * u_iRes;
 
 	float depth = texture2D( u_depth_texture, uv ).x;
 

@@ -303,6 +303,18 @@ void Application::renderDebugGUI(void)
 		scene->shadow_resolution_trigger = ImGui::Combo("Shadow Resolution", &scene->atlas_resolution_index, scene->shadow_resolutions, IM_ARRAYSIZE(scene->shadow_resolutions)); //Shadow Atlas resolution
 	}
 
+	ImGui::Text("\nSSAO");
+	switch (scene->SSAO_type) {
+	case (0):
+		ImGui::Checkbox("SSAO", &scene->show_ssao);
+		break;
+	case(1):
+		ImGui::Checkbox("SSAO+", &scene->show_ssaop);
+		break;
+	}
+
+	ImGui::Combo("Swap SSAO", (int*)&scene->SSAO_type, "SSAO\0SSAOp", 2);
+
 	//Gamma space and tone mapper
 	if (scene->render_pipeline == GTR::Scene::Forward || scene->buffer_range == GTR::Scene::HDR)
 	{
