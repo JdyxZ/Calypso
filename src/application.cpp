@@ -308,7 +308,13 @@ void Application::renderDebugGUI(void)
 	{
 		ImGui::Text("\nColor correction");
 		ImGui::Checkbox("Gamma correction", &scene->gamma_correction);
-		ImGui::Checkbox("Tone mapper", &scene->tone_mapper);
+		ImGui::Checkbox("Tone mapper", &scene->tone_mapper.working);
+		if (scene->tone_mapper.working)
+		{
+			ImGui::SliderFloat("Color scale", &scene->tone_mapper.color_scale, 0.f, 1.f);
+			ImGui::SliderFloat("Avarage illumination", &scene->tone_mapper.avarage_illumination, 0.f, 1.f);
+			ImGui::SliderFloat("White illumination", &scene->tone_mapper.white_illumination, 0.f, 1.f);
+		}
 	}
 
 	if(lights)

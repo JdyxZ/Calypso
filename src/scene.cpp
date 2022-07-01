@@ -43,9 +43,14 @@ GTR::Scene::Scene()
 	toggle_buffers = false;
 	buffer_range = HDR;
 
-	//Color correction algorithms
+	//Color correction algorithm
 	gamma_correction = true;
-	tone_mapper = true;
+	
+	//Tone mapper
+	tone_mapper.working = true;
+	tone_mapper.color_scale = 0.f;
+	tone_mapper.avarage_illumination = 0.f;
+	tone_mapper.white_illumination = 0.f;
 
 	//Scene triggers: We set some of them true just for the first iteration
 	light_switch_trigger = false;
@@ -128,9 +133,9 @@ bool GTR::Scene::load(const char* filename)
 	//Read global properties
 	background_color = readJSONVector3(json, "background_color", background_color);
 	ambient_light = readJSONVector3(json, "ambient_light", ambient_light);
-	color_scale = readJSONNumber(json, "color_scale", color_scale);
-	avarage_lum = readJSONNumber(json, "avarage_lum", avarage_lum);
-	white_lum = readJSONNumber(json, "white_lum", white_lum);
+	tone_mapper.color_scale = readJSONNumber(json, "color_scale", tone_mapper.color_scale);
+	tone_mapper.avarage_illumination = readJSONNumber(json, "avarage_illumination", tone_mapper.avarage_illumination);
+	tone_mapper.white_illumination = readJSONNumber(json, "white_illumination", tone_mapper.white_illumination);
 	Vector3 eye = readJSONVector3(json, "camera_position", main_camera->eye);
 	Vector3 center = readJSONVector3(json, "camera_target", main_camera->center);
 	float fov = readJSONNumber(json, "camera_fov", main_camera->fov);
@@ -196,9 +201,9 @@ bool GTR::Scene::save()
 	writeJSONString(scene_json, "environment", "night.hdre");
 	writeJSONVector3(scene_json, "background_color", background_color);
 	writeJSONVector3(scene_json, "ambient_light", ambient_light);
-	writeJSONNumber(scene_json, "color_scale", color_scale);
-	writeJSONNumber(scene_json, "avarage_lum", avarage_lum);
-	writeJSONNumber(scene_json, "white_lum", white_lum);
+	writeJSONNumber(scene_json, "color_scale", tone_mapper.color_scale);
+	writeJSONNumber(scene_json, "avarage_illumination", tone_mapper.avarage_illumination);
+	writeJSONNumber(scene_json, "white_illumination", tone_mapper.white_illumination);
 	writeJSONVector3(scene_json, "camera_position", this->main_camera->eye);
 	writeJSONVector3(scene_json, "camera_target", this->main_camera->center);
 	writeJSONNumber(scene_json, "camera_fov", 80);

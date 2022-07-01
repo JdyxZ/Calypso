@@ -134,9 +134,6 @@ namespace GTR {
 		//Scene properties
 		Vector3 background_color;
 		Vector3 ambient_light;
-		float color_scale;
-		float avarage_lum;
-		float white_lum;
 		Camera* main_camera;
 
 		//Scene algorithms
@@ -169,7 +166,16 @@ namespace GTR {
 
 		//Color correction
 		bool gamma_correction; // Show the difference between working in linear space and reconverting to gamma space and only work in gamma space.
-		bool tone_mapper; //Use tone mapper to improve visual perception.
+
+		//Tone mapper
+		struct ToneMapper
+		{
+			bool working; //Use tone mapper to improve visual perception.
+			float color_scale;
+			float avarage_illumination;
+			float white_illumination;
+		};
+		ToneMapper tone_mapper;
 
 		//Scene triggers
 		bool light_switch_trigger; //Triggers if the user has checked or un checked the light switch checkbox.

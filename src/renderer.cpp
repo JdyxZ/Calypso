@@ -573,6 +573,10 @@ void GTR::Renderer::setForwardSceneUniforms(Shader* shader)
 	shader->setUniform("u_geometry_shadowing", scene->smith_aproximation);
 	shader->setUniform("u_light_pass", scene->light_pass);
 	shader->setUniform("u_gamma_correction", scene->gamma_correction);
+	shader->setUniform("u_tone_mapper", scene->tone_mapper.working);
+	shader->setUniform("u_color_scale", scene->tone_mapper.color_scale);
+	shader->setUniform("u_average_illumination", scene->tone_mapper.avarage_illumination);
+	shader->setUniform("u_white_illumination", scene->tone_mapper.white_illumination);
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
 	shader->setUniform("u_time", getTime());
@@ -701,6 +705,10 @@ void GTR::Renderer::setDeferredSceneUniforms(Shader* shader)
 	shader->setUniform("u_geometry_shadowing", scene->smith_aproximation);
 	shader->setUniform("u_light_pass", scene->light_pass);
 	shader->setUniform("u_gamma_correction", scene->gamma_correction);
+	shader->setUniform("u_tone_mapper", scene->tone_mapper.working);
+	shader->setUniform("u_color_scale", scene->tone_mapper.color_scale);
+	shader->setUniform("u_average_lum", scene->tone_mapper.avarage_illumination);
+	shader->setUniform("u_white_lum", scene->tone_mapper.white_illumination);
 	shader->setUniform("u_ambient_light", scene->ambient_light);
 	shader->setUniform("u_emissive_materials", scene->emissive_materials);
 	shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
@@ -885,7 +893,7 @@ void GTR::Renderer::renderGBuffers(Shader* shader, RenderCall* rc, Camera* camer
 void GTR::Renderer::IlluminationNTransparencies()
 {
 	//Crete the illumination fbo if they don't exist yet
-	if (!illumination_fbo || scene->resolution_trigger || scene->buffer_range_trigger)
+	if (!illumination_fbo || scene->resolution_trigger)
 	{
 		if (illumination_fbo)
 		{
@@ -900,7 +908,7 @@ void GTR::Renderer::IlluminationNTransparencies()
 		illumination_fbo->create(window_size.x, window_size.y,
 			2, 					//two texture
 			GL_RGB, 			//three channels
-			buffer_range,		//SDR or HDR
+			GL_UNSIGNED_BYTE,		//SDR or HDR
 			true);				//add depth_texture
 	}
 
