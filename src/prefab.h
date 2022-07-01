@@ -111,7 +111,7 @@ namespace GTR {
 		Node* getNodeByName(const char* name);
 
 				//Manager to cache loaded prefabs
-		static std::map<std::string, Prefab*> sPrefabsLoaded; //List of loaded Prefabs (in case the prefab already exist in memory, we don't load it twice).
+		static std::map<std::string, Prefab*> sPrefabsLoaded;
 		static Prefab* Get(const char* filename);
 		void registerPrefab(std::string name);
 	};

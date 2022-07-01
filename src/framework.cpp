@@ -99,6 +99,14 @@ float Vector3::distance(const Vector3& v) const
 	return (float)(v - *this).length();
 }
 
+void Vector3::print()
+{
+	cout << "Vector components" << endl << endl;
+	cout << this->x << endl;
+	cout << this->y << endl;
+	cout << this->z << endl << endl;;
+}
+
 Vector3 Vector3::cross( const Vector3& b ) const
 {
 	return Vector3(y*b.z - z*b.y, z*b.x - x*b.z, x*b.y - y*b.x);
@@ -169,31 +177,7 @@ void Vector3::parseFromText(const char* text, const char separator)
 
 		++current;
 	}
-}
-void Vector3::print()
-{
-	cout << "Vector components" << endl << endl;
-	cout << this->x << endl;
-	cout << this->y << endl;
-	cout << this->z << endl << endl;;
-}
-;
-
-float dot(const Vector3& a, const Vector3& b)
-{
-	return a.x*b.x + a.y*b.y + a.z*b.z;
-}
-
-Vector3 cross(const Vector3& a, const Vector3& b)
-{
-	return Vector3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
-}
-
-Vector3 lerp(const Vector3& a, const Vector3& b, float v)
-{
-	return a * (1.0 - v) + b * v;
-}
-
+};
 
 //*********************************
 const Matrix44 Matrix44::IDENTITY;
@@ -222,6 +206,16 @@ void Matrix44::load()
 }
 #endif
 
+void Matrix44::print()
+{
+	cout << endl << "Printing Matrix..." << endl << endl;
+	cout << M[0][0] << "\t\t" << M[0][1] << "\t\t" << M[0][2] << "\t\t" << M[0][3] << endl;
+	cout << M[1][0] << "\t\t" << M[1][1] << "\t\t" << M[1][2] << "\t\t" << M[1][3] << endl;
+	cout << M[2][0] << "\t\t" << M[2][1] << "\t\t" << M[2][2] << "\t\t" << M[2][3] << endl;
+	cout << M[3][0] << "\t\t" << M[3][1] << "\t\t" << M[3][2] << "\t\t" << M[3][3] << endl;
+
+}
+
 void Matrix44::clear()
 {
 	memset(m, 0, 16*sizeof(float));
@@ -239,16 +233,6 @@ void Matrix44::transpose()
 {
    std::swap(m[1],m[4]); std::swap(m[2],m[8]); std::swap(m[3],m[12]);
    std::swap(m[6],m[9]); std::swap(m[7],m[13]); std::swap(m[11],m[14]);
-}
-
-void Matrix44::print()
-{
-	cout << endl << "Printing Matrix..." << endl << endl;
-	cout << M[0][0] << "\t\t" << M[0][1] << "\t\t" << M[0][2] << "\t\t" << M[0][3] << endl;
-	cout << M[1][0] << "\t\t" << M[1][1] << "\t\t" << M[1][2] << "\t\t" << M[1][3] << endl;
-	cout << M[2][0] << "\t\t" << M[2][1] << "\t\t" << M[2][2] << "\t\t" << M[2][3] << endl;
-	cout << M[3][0] << "\t\t" << M[3][1] << "\t\t" << M[3][2] << "\t\t" << M[3][3] << endl;
-
 }
 
 Vector3 Matrix44::rotateVector(const Vector3& v) const
@@ -314,10 +298,12 @@ Vector3 Matrix44::getTranslation()
 	return Vector3(m[12],m[13],m[14]);
 }
 
+
 Vector3 Matrix44::getScale()
 {
 	return Vector3(m[0], m[5], m[10]);
 }
+
 
 //To create a rotation matrix
 void Matrix44::setRotation( float angle_in_rad, const Vector3& axis  )
@@ -1306,11 +1292,6 @@ bool RayPlaneCollision(const Vector3& plane_pos, const Vector3& plane_normal, co
 		return false;
 	result = ray_origin + ray_dir * t;
 	return true;
-}
-
-Vector3 normalize(Vector3 n)
-{
-	return n.normalize();
 }
 
 int planeBoxOverlap( const Vector4& plane, const Vector3& center, const Vector3& halfsize )
