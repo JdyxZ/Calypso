@@ -4,6 +4,7 @@
 #include "framework.h"
 #include "camera.h"
 #include <string>
+#include <map>
 
 //forward declaration
 class cJSON; 
@@ -208,9 +209,11 @@ namespace GTR {
 
 		std::string filename;
 		std::vector<BaseEntity*> entities;
+		std::map<std::string, BaseEntity*> entities_by_name;
 
 		void clear();
 		void addEntity(BaseEntity* entity);
+		BaseEntity* getEntityByName(std::string name);
 		void removeEntity(BaseEntity* entity);
 		std::string nameEntity(std::string default_name);
 		BaseEntity* createEntity(std::string type);

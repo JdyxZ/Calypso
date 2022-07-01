@@ -52,6 +52,7 @@ namespace GTR {
 
 		//Render variables
 		std::vector<LightEntity*> lights; //Here we store each Light to be sent to the Shadder.
+		LightEntity* direct_light;
 		std::vector<RenderCall*> render_calls; // Here we store each RenderCall to be sent to the Shadder.
 		std::vector<RenderCall*> transparent_objects; //Here we store the RenderCalls of the objects that need blending (for Deferred pipeline)
 
@@ -126,6 +127,9 @@ namespace GTR {
 		void renderDepthMap(RenderCall* rc, Camera* light_camera);
 		void showShadowAtlas();
 
+		//VOlumetricLight
+		void InitVolumetric();
+		
 		//PostFx
 		void applyFx(Camera* camera, Texture* color_tex, Texture* depth_tex);
 		void loadFx(int FxType, FBO* fbo, Texture* current_Tex, Texture* alter_tex, char* shadername);

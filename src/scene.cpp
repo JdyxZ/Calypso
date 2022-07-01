@@ -44,7 +44,7 @@ GTR::Scene::Scene()
 	buffer_range = HDR;
 
 	//Color correction algorithms
-	gamma_correction = true;
+	gamma_correction = false;
 	tone_mapper = true;
 
 	//Scene triggers: We set some of them true just for the first iteration
@@ -93,6 +93,16 @@ GTR::BaseEntity* GTR::Scene::createEntity(std::string type)
 void GTR::Scene::addEntity(BaseEntity* entity)
 {
 	entities.push_back(entity); entity->scene = this;
+	if(entity->name.size())
+		entities_by_name[entity->name] = entity;
+}
+
+GTR::BaseEntity* GTR::Scene::getEntityByName(std::string name)
+{
+	auto it = entities_by_name.find(name);
+	if (it == entities_by_name.end())
+		return NULL;
+	return it->second;
 }
 
 void GTR::Scene::removeEntity(BaseEntity* entity) {

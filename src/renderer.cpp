@@ -54,9 +54,13 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	illumination_fbo = NULL;
 	ssao_fbo = NULL;
 	ssao_p_fbo = NULL;
+	volumetric_fbo = NULL;
 
 	rand_points_ssao = generateSpherePoints(64, 1, false);
 	rand_points_ssao_p = generateSpherePoints(64, 1, true);
+
+	//Volumetric
+	direct_light = NULL;
 
 	//PostFx Tex
 	postTexA = NULL;
@@ -135,6 +139,8 @@ void Renderer::processScene()
 		if (ent->entity_type == LIGHT) {
 			LightEntity* light = (LightEntity*)ent;
 			lights.push_back(light);
+			if (light->light_type == LightType::DIRECTIONAL)
+				direct_light = light;
 		}
 	}
 	
@@ -686,6 +692,8 @@ void GTR::Renderer::renderDeferred()
 	//Illumination and transparencies
 	IlluminationNTransparencies();
 
+	InitVolumetric();
+
 	InitPostFxTextures();
 
 	//Show Buffers or render the final frame
@@ -701,6 +709,54 @@ void GTR::Renderer::renderDeferred()
 	}
 
 }
+
+void GTR::Renderer::InitVolumetric() {
+	//Crete the illumination fbo if they don't exist yet
+	if (!volumetric_fbo || scene->resolution_trigger || scene->buffer_range_trigger)
+	{
+		if (volumetric_fbo)
+		{
+			delete volumetric_fbo;
+			volumetric_fbo = NULL;
+		}
+
+		//Create a new FBO
+		volumetric_fbo = new FBO();
+
+		//Create one texture with RGB components
+		volumetric_fbo->create(window_size.x, window_size.y,
+			2, 					//two texture
+			GL_RGB, 			//three channels
+			buffer_range,		//SDR or HDR
+			true);				//add depth_texture
+	}
+
+	//Start rendering inside the illumination fbo
+	volumetric_fbo->bind();
+
+	Shader* shader = Shader::Get("volumetric");
+
+	shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
+	shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
+	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+	if (scene->SSAO_type == SSAOType::SSAOp)
+	{
+		shader->setTexture("u_ssao_texture", ssao_p_fbo->color_textures[0], 4);
+	}
+	else {
+		shader->setTexture("u_ssao_texture", ssao_fbo->color_textures[0], 4);
+	}
+	direct_light.
+	Mesh* quad;
+
+	quad->render(GL_TRIANGLES);
+	
+	//Stop rendering to the illumination fbo
+	volumetric_fbo->unbind();
+	volumetric_fbo->color_textures[0]->toViewport();
+}
+
+
 
 void GTR::Renderer::InitPostFxTextures()
 {
