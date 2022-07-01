@@ -85,7 +85,7 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	rand_points_ssao = generateSpherePoints(64, 1, false);
 	rand_points_ssao_p = generateSpherePoints(64, 1, true);
 
-	//cube.createCube(Vector3(1.0, 1.0, 1.0));
+	cube.createCube(Vector3(1.0, 1.0, 1.0));
 
 	//Volumetric
 	direct_light = NULL;
@@ -253,7 +253,7 @@ void GTR::Renderer::renderWithoutLights()
 	//Upload scene uniforms
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_emissive_materials", scene->emissive_materials);
-	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_time", (float)getTime());
 
 	//Send render calls to the GPU
 	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
@@ -626,7 +626,7 @@ void GTR::Renderer::setForwardSceneUniforms(Shader* shader)
 	shader->setUniform("u_gamma_correction", scene->gamma_correction);
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_time", (float)getTime());
 	shader->setUniform("u_occlusion", scene->occlusion);
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
@@ -787,8 +787,6 @@ void GTR::Renderer::DecalsFBO() {
 	glColorMask(true, true, true, false);
 	//Start rendering inside the gbuffers fbo
 	gbuffers_fbo->bind();
-
-	cube.createCube(Vector3(20.0, 20.0, 20.0));
 	
 	Shader* shader = Shader::Get("decal");
 	if (!shader)
@@ -1073,7 +1071,7 @@ void GTR::Renderer::setDeferredSceneUniforms(Shader* shader)
 	shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
 	shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
 	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_time", (float)getTime());
 	shader->setUniform("u_occlusion", scene->occlusion);
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
@@ -1136,7 +1134,7 @@ void GTR::Renderer::GBuffers()
 	//Upload Scene Uniforms
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_time", (float)getTime());
 
 	//Send render calls to the GPU
 	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
