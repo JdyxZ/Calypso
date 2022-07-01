@@ -299,19 +299,19 @@ vec3 BRDF(const in vec3 L, const in vec3 V, const in vec3 N, const in vec3 albed
 //Gamma support uniform
 uniform bool u_gamma_correction;
 
-vec3 degamma(vec3 color)
+vec3 degamma(in vec3 color)
 {
 	if(u_gamma_correction) return pow(color,vec3(2.2));
 	else return color;
 }
 
-vec4 degamma(vec4 color)
+vec4 degamma(in vec4 color)
 {
 	if(u_gamma_correction) return vec4(pow(color.rgb,vec3(2.2)),color.a);
 	else return color;
 }
 
-vec3 gamma(vec3 color)
+vec3 gamma(in vec3 color)
 {
 	if(u_gamma_correction)
 	{
@@ -321,7 +321,7 @@ vec3 gamma(vec3 color)
 	else return color;
 }
 
-vec4 gamma(vec4 color)
+vec4 gamma(in vec4 color)
 {
 	if(u_gamma_correction)
 	{
@@ -335,23 +335,41 @@ vec4 gamma(vec4 color)
 
 //Uniforms
 uniform bool u_tone_mapper;
-uniform float u_scale; //color scale before tonemapper
-uniform float u_average_lum; 
-uniform float u_white_lum;
+uniform float u_color_scale; //color scale before tonemapper
+uniform float u_average_illumination; 
+uniform float u_white_illumination;
 
-void main(inout vec3 color) {
+vec4 map_tone(in vec4 color) 
+{
+
+	if(u_tone_mapper)
+	{
+		float lum = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+		float L = (u_color_scale / u_average_illumination) * lum;
+		float Ld = (L * (1.0 + L / u_white_illumination)) / (1.0 + L);
+
+		color.rgb = (color.rgb / lum) * Ld;
+		color.rgb = max(color.rgb, vec3(0.001));
+	}
+
+	return color;
+}
+
+vec3 map_tone(in vec3 color) 
+{
 
 	if(u_tone_mapper)
 	{
 		float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
-		float L = (u_scale / u_average_lum) * lum;
-		float Ld = (L * (1.0 + L / u_white_lum)) / (1.0 + L);
+		float L = (u_color_scale / u_average_illumination) * lum;
+		float Ld = (L * (1.0 + L / u_white_illumination)) / (1.0 + L);
 
 		color = (color / lum) * Ld;
-		color = max(color,vec3(0.001));
+		color = max(color, vec3(0.001));
 	}
-}
 
+	return color;
+}
 
 \lighting
 
@@ -693,14 +711,15 @@ out vec4 FragColor;
 
 //Includes
 #include gamma_correction
+#include tone_mapper
 
 void main()
 {
 	//Material color
-	vec4 color = degamma(u_color);
+	vec4 color = degamma(map_tone(u_color));
 
 	//Load color texture values with texture interpolated coordinates
-	color *= degamma(texture2D( u_color_texture, v_uv ));	
+	color *= degamma(map_tone(texture2D( u_color_texture, v_uv )));	
 
 	//Mask
 	if(color.a < u_alpha_cutoff)
@@ -753,16 +772,17 @@ out vec4 FragColor;
 #include phong
 #include PBR
 #include gamma_correction
+#include tone_mapper
 #include lighting
 
 void main()
 {
 	//Material color
-	vec4 color = degamma(u_color);
+	vec4 color = degamma(map_tone(u_color));
 
 	//Load texture values with texture interpolated coordinates
 	vec3 tangent_space_normal = texture2D( u_normal_texture, v_uv ).xyz;
-	color *= degamma(texture2D( u_color_texture, v_uv ));	
+	color *= degamma(map_tone(texture2D( u_color_texture, v_uv )));	
 	vec3 omr = texture2D(u_omr_texture,v_uv).xyz;
 	float ao_factor = 1.0;
 
@@ -1119,14 +1139,15 @@ layout(location = 2) out vec4 GB2;
 //Includes
 #include normal_mapping
 #include gamma_correction
+#include tone_mapper
 
 void main()
 {
 	//Material color
-	vec4 color = degamma(u_color);
+	vec4 color = degamma(map_tone(u_color));
 
 	//Load texture values with texture interpolated coordinates
-	color *= degamma(texture2D( u_color_texture, v_uv )); 
+	color *= degamma(map_tone(texture2D( u_color_texture, v_uv )));
 	vec3 tangent_space_normal = texture2D( u_normal_texture, v_uv ).xyz; 
 	vec3 omr = texture2D(u_omr_texture,v_uv).xyz;
 	vec3 emissive_color = u_emissive_factor * degamma(texture2D(u_emissive_texture,v_uv).xyz);
