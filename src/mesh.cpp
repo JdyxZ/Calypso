@@ -1352,9 +1352,6 @@ void Mesh::createCube(Vector3 size)
 	uvs.resize(6 * 2 * 3);
 	memcpy(&vertices[0], _verts, sizeof(Vector3) * vertices.size());
 	memcpy(&uvs[0], _uvs, sizeof(Vector2) * uvs.size());
-	for (int i = 0; i < vertices.size(); ++i)
-		vertices[i] = vertices[i] * (size * 0.5);
-
 	box.center.set(0, 0, 0);
 	box.halfsize = size * 0.5;
 	radius = (float)box.halfsize.length();

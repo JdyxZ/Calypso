@@ -292,7 +292,7 @@ bool GTR::Scene::save()
 				DecalEntity* decal = (DecalEntity*)entity;
 				writeJSONString(new_entity, "name", decal->name);
 				writeJSONString(new_entity, "type", "DECAL");
-				writeJSONString(new_entity, "filename", decal->texture->filename);
+				writeJSONString(new_entity, "filename", decal->texture);
 				writeJSONFloatVector(new_entity, "model", decal->model.m, 16);
 				break;
 			}
@@ -453,11 +453,8 @@ GTR::DecalEntity::DecalEntity(){
 }
 
 void GTR::DecalEntity::configure(cJSON* json) {
-	if (cJSON_GetObjectItem(json, "texture")) {
-		std::string filename = cJSON_GetObjectItem(json, "texture")->valuestring;
-		if (!filename.empty())
-			texture = Texture::Get(filename.c_str());
-
+	if (cJSON_GetObjectItem(json, "filename")) {
+		texture = cJSON_GetObjectItem(json, "filename")->valuestring;
 	}
 }
 

@@ -85,7 +85,7 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	rand_points_ssao = generateSpherePoints(64, 1, false);
 	rand_points_ssao_p = generateSpherePoints(64, 1, true);
 
-	cube.createCube(Vector3(1.0, 1.0, 1.0));
+	cube.createCube(Vector3(1,1,1));
 
 	//Volumetric
 	direct_light = NULL;
@@ -786,6 +786,7 @@ void GTR::Renderer::DecalsFBO() {
 	Vector2 i_Res = Vector2(1.0 / (float)window_size.x, 1.0 / (float)window_size.y);
 	Matrix44 inv_camera_vp = camera->viewprojection_matrix;
 	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
+
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC0_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glColorMask(true, true, true, false);
@@ -812,7 +813,7 @@ void GTR::Renderer::DecalsFBO() {
 	{
 		DecalEntity* decal = decals[i];
 		shader->setUniform("u_model", decal->model);
-		Texture* decal_tex = decal->texture;
+		Texture* decal_tex = Texture::Get(decal->texture.c_str());
 		if (!decal_tex)
 			continue;
 		shader->setTexture("u_decal_texture", decal_tex, 5);

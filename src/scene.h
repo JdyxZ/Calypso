@@ -101,7 +101,7 @@ namespace GTR {
 	class DecalEntity : public GTR::BaseEntity
 	{
 	public:
-		Texture* texture;
+		std::string texture;
 
 		DecalEntity();
 		virtual void renderInMenu() {};
