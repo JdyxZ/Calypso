@@ -28,11 +28,15 @@
 *.lib
 
 # Executables
+*.exe
 *.out
 *.app
 
 /.vs
 /visualstudio/.vs
+visualstudio/VS2015/Debug
+visualstudio/VS2015/Release
+visualstudio/VS2015/Final
 *.iobj
 *.pdb
 *.ipdb
