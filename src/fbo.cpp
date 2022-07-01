@@ -98,6 +98,8 @@ bool FBO::setTextures(std::vector<Texture*> textures, Texture* depth_texture, in
 	assert(textures.size() >= 0 && textures.size() <= 4);
 	assert(glGetError() == GL_NO_ERROR);
 	assert(textures.size() || depth_texture ); //at least one texture
+	int format = 0; //RGB,RGBA
+	int type = 0;//UNSIGNED_BYTE
 	if (textures.size())
 	{
 		width = (int)textures[0]->width;
@@ -248,6 +250,18 @@ void FBO::enableSingleBuffer(int num)
 	assert(num < this->num_color_textures);
     GLenum DrawBuffers[1] = {static_cast<GLenum>( (int)GL_COLOR_ATTACHMENT0) + num };
 	glDrawBuffers(1, DrawBuffers); // "1" is the size of DrawBuffers
+}
+
+void FBO::enableBuffers(bool buffer0, bool buffer1, bool buffer2, bool buffer3)
+{
+	GLenum bufs[4];
+	int index = 0;
+	bufs[index++] = buffer0 ? static_cast<GLenum>((int)GL_COLOR_ATTACHMENT0) + 0 : GL_NONE;
+	bufs[index++] = buffer1 ? static_cast<GLenum>((int)GL_COLOR_ATTACHMENT0) + 1 : GL_NONE;
+	bufs[index++] = buffer2 ? static_cast<GLenum>((int)GL_COLOR_ATTACHMENT0) + 2 : GL_NONE;
+	bufs[index++] = buffer3 ? static_cast<GLenum>((int)GL_COLOR_ATTACHMENT0) + 3 : GL_NONE;
+
+	glDrawBuffers(index, bufs);
 }
 
 void FBO::enableAllBuffers()

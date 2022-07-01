@@ -30,7 +30,6 @@
 // includes patches for multiview from
 // https://github.com/CedricGuillemet/ImGuizmo/issues/15
 
-
 namespace ImGuizmo
 {
    static const float ZPI = 3.14159265358979323846f;
@@ -1544,7 +1543,7 @@ namespace ImGuizmo
       return type;
    }
 
-   static void HandleTranslation(float *matrix, float *deltaMatrix, int& type, float *snap, bool* change)
+   static void HandleTranslation(float* matrix, float* deltaMatrix, int& type, float* snap, bool* change)
    {
       ImGuiIO& io = ImGui::GetIO();
       bool applyRotationLocaly = gContext.mMode == LOCAL || type == MOVE_SCREEN;
@@ -1557,6 +1556,8 @@ namespace ImGuizmo
          ImGui::CaptureMouseFromApp();
          const float len = fabsf(IntersectRayPlane(gContext.mRayOrigin, gContext.mRayVector, gContext.mTranslationPlan)); // near plan
          vec_t newPos = gContext.mRayOrigin + gContext.mRayVector * len;
+
+
 
          // compute delta
          vec_t newOrigin = newPos - gContext.mRelativeOrigin * gContext.mScreenFactor;
@@ -1643,7 +1644,7 @@ namespace ImGuizmo
       }
    }
 
-   static void HandleScale(float *matrix, float *deltaMatrix, int& type, float *snap, bool* change)
+   static void HandleScale(float* matrix, float* deltaMatrix, int& type, float* snap, bool* change)
    {
       ImGuiIO& io = ImGui::GetIO();
 
@@ -1733,7 +1734,7 @@ namespace ImGuizmo
       }
    }
 
-   static void HandleRotation(float *matrix, float *deltaMatrix, int& type, float *snap, bool* change)
+   static void HandleRotation(float* matrix, float* deltaMatrix, int& type, float* snap, bool* change)
    {
       ImGuiIO& io = ImGui::GetIO();
       bool applyRotationLocaly = gContext.mMode == LOCAL;
@@ -1866,44 +1867,44 @@ namespace ImGuizmo
       mat.v.position.Set(translation[0], translation[1], translation[2], 1.f);
    }
 
-   void Manipulate(const float *view, const float *projection, OPERATION operation, MODE mode, float *matrix, float *deltaMatrix, float *snap, float *localBounds, float *boundsSnap, bool* change)
+   void Manipulate(const float* view, const float* projection, OPERATION operation, MODE mode, float* matrix, float* deltaMatrix, float* snap, float* localBounds, float* boundsSnap, bool* change)
    {
-      ComputeContext(view, projection, matrix, mode);
+       ComputeContext(view, projection, matrix, mode);
 
-      // set delta to identity
-      if (deltaMatrix)
-         ((matrix_t*)deltaMatrix)->SetToIdentity();
+       // set delta to identity
+       if (deltaMatrix)
+           ((matrix_t*)deltaMatrix)->SetToIdentity();
 
-      // behind camera
-      vec_t camSpacePosition;
-      camSpacePosition.TransformPoint(makeVect(0.f, 0.f, 0.f), gContext.mMVP);
-      if (!gContext.mIsOrthographic && camSpacePosition.z < 0.001f)
-         return;
+       // behind camera
+       vec_t camSpacePosition;
+       camSpacePosition.TransformPoint(makeVect(0.f, 0.f, 0.f), gContext.mMVP);
+       if (!gContext.mIsOrthographic && camSpacePosition.z < 0.001f)
+           return;
 
-      // --
-      int type = NONE;
-      if (gContext.mbEnable)
-      {
-          if (!gContext.mbUsingBounds)
-          {
-              switch (operation)
-              {
-              case ROTATE:
-                  HandleRotation(matrix, deltaMatrix, type, snap, change);
-                  break;
-              case TRANSLATE:
-                  HandleTranslation(matrix, deltaMatrix, type, snap, change);
-                  break;
-              case SCALE:
-                  HandleScale(matrix, deltaMatrix, type, snap, change);
-                  break;
-              case BOUNDS:
-                  break;
-              }
-          }
-      }
+       // --
+       int type = NONE;
+       if (gContext.mbEnable)
+       {
+           if (!gContext.mbUsingBounds)
+           {
+               switch (operation)
+               {
+               case ROTATE:
+                   HandleRotation(matrix, deltaMatrix, type, snap, change);
+                   break;
+               case TRANSLATE:
+                   HandleTranslation(matrix, deltaMatrix, type, snap, change);
+                   break;
+               case SCALE:
+                   HandleScale(matrix, deltaMatrix, type, snap, change);
+                   break;
+               case BOUNDS:
+                   break;
+               }
+           }
+       }
 
-      if (localBounds && !gContext.mbUsing)
+       if (localBounds && !gContext.mbUsing)
           HandleAndDrawLocalBounds(localBounds, (matrix_t*)matrix, boundsSnap, operation);
 
       if (!gContext.mbUsingBounds)

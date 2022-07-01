@@ -55,28 +55,10 @@ public:
 		int pos = y*width* num_channels + x* num_channels;
 		return Color(data[pos], data[pos + 1], data[pos + 2], num_channels == 4 ? 255 : data[pos + 3]);
 	};
-	unsigned char getPixel(int x, int y, unsigned int channel)
-	{
-		if (channel >= 0 && channel < num_channels)
-		{
-			assert(x >= 0 && x < (int)width&& y >= 0 && y < (int)height && "reading of memory");
-			int pos = y * width * num_channels + x * num_channels;
-			return data[pos + channel];
-		}
-	};
 	void setPixel(int x, int y, Color v) {
 		assert(x >= 0 && x < (int)width && y >= 0 && y < (int)height && "writing of memory");
 		int pos = y*width*num_channels + x* num_channels;
 		data[pos] = v.x; data[pos + 1] = v.y; data[pos + 2] = v.z; if (num_channels == 4) data[pos + 3] = v.w;
-	};
-	void setPixel(int x, int y, unsigned int channel, unsigned char v)
-	{
-		if (channel >= 0 && channel < num_channels)
-		{
-			assert(x >= 0 && x < (int)width&& y >= 0 && y < (int)height && "writing of memory");
-			int pos = y * width * num_channels + x * num_channels;
-			data[pos + channel] = v;
-		}
 	};
 
 	Color getPixelInterpolated(float x, float y, bool repeat = false);

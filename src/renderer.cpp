@@ -49,7 +49,7 @@ GTR::Renderer::Renderer()
 
 void::Renderer::renderSkybox(Camera* camera) 
 {
-	Mesh* mesh = Mesh::Get("data/meshes/sphere.obj",true);
+	Mesh* mesh = Mesh::Get("data/meshes/sphere.obj");
 	Shader* shader = Shader::Get("skybox");
 	shader->enable();
 
@@ -85,7 +85,7 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	rand_points_ssao = generateSpherePoints(64, 1, false);
 	rand_points_ssao_p = generateSpherePoints(64, 1, true);
 
-	cube.createCube();
+	//cube.createCube(Vector3(1.0, 1.0, 1.0));
 
 	//Volumetric
 	direct_light = NULL;
@@ -787,6 +787,8 @@ void GTR::Renderer::DecalsFBO() {
 	glColorMask(true, true, true, false);
 	//Start rendering inside the gbuffers fbo
 	gbuffers_fbo->bind();
+
+	cube.createCube(Vector3(20.0, 20.0, 20.0));
 	
 	Shader* shader = Shader::Get("decal");
 	if (!shader)
@@ -821,6 +823,7 @@ void GTR::Renderer::DecalsFBO() {
 	shader->disable();
 	//Stop rendering to the gbuffers fbo
 	gbuffers_fbo->unbind();
+
 	glDisable(GL_BLEND);
 	glColorMask(true, true, true, true);
 

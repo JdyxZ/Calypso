@@ -94,6 +94,7 @@ public:
 	};
 
 	Vector3() { x = y = z = 0.0f; }
+	Vector3(float v) { x = y = z = v; }
 	Vector3(float x, float y, float z) { this->x = x; this->y = y; this->z = z;	}
 
 	double length();
@@ -109,12 +110,13 @@ public:
 	void random(Vector3 range);
 
 	float distance(const Vector3& v) const;
+
+	void print();
 	
 	Vector3 cross( const Vector3& v ) const;
 	float dot( const Vector3& v ) const;
 
 	void parseFromText(const char* text, const char separator);
-	void print();
 
 	float& operator [] (int n) { return v[n]; }
 	void operator += (const Vector3& v) { x += v.x; y += v.y; z += v.z; }
@@ -125,16 +127,17 @@ public:
 	void operator = (float* v) { x = v[0]; y = v[1]; z = v[2]; }
 };
 
-Vector3 normalize(Vector3 n);
-float dot( const Vector3& a, const Vector3& b);
-Vector3 cross(const Vector3&a, const Vector3& b);
-Vector3 lerp(const Vector3& a, const Vector3& b, float v);
-
 inline Vector3 operator + (const Vector3& a, const Vector3& b) { return Vector3(a.x + b.x, a.y + b.y, a.z + b.z); }
 inline Vector3 operator - (const Vector3& a, const Vector3& b) { return Vector3(a.x - b.x, a.y - b.y, a.z - b.z); }
 inline Vector3 operator * (const Vector3& a, const Vector3& b) { return Vector3(a.x * b.x, a.y * b.y, a.z * b.z); }
 inline Vector3 operator * (const Vector3& a, float v) { return Vector3(a.x * v, a.y * v, a.z * v); }
 inline Vector3 operator * (float v, const Vector3& a) { return Vector3(a.x * v, a.y * v, a.z * v); }
+
+inline Vector3 normalize(Vector3 n) { return n.normalize(); }
+inline float dot(const Vector3& a, const Vector3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+inline Vector3 cross(const Vector3& a, const Vector3& b) { return Vector3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x); }
+inline Vector3 lerp(const Vector3& a, const Vector3& b, float v) { return a * (1.0f - v) + b * v; }
+
 
 class Vector4
 {
@@ -217,12 +220,13 @@ class Matrix44
 		Matrix44(const float* v);
 
 		void set(); //multiply with opengl matrix
-		void load(); //load in opengl matrix
+		void load();
+		void print();
+		//load in opengl matrix
 		void clear();
 		void setIdentity();
 		void transpose();
 		void normalizeAxis();
-		void print();
 
 		//get base vectors
 		Vector3 rightVector() { return Vector3(m[0],m[1],m[2]); }
@@ -252,7 +256,6 @@ class Matrix44
 		void setRotation( float angle_in_rad, const Vector3& axis );
 		void setScale(float x, float y, float z);
 
-		//TRS values
 		Vector3 getTranslation();
 		Vector3 getScale();
 

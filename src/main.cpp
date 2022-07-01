@@ -15,7 +15,6 @@
 #include "utils.h"
 #include "input.h"
 #include "application.h"
-#include "scene.h"
 #include "task.h"
 
 #include <iostream> //to output
@@ -122,6 +121,7 @@ void renderDebug(SDL_Window* window, Application * app)
 	ImGui::Render();
 	glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	glGetError();
 	#endif
 }
 
@@ -141,8 +141,7 @@ void mainLoop(SDL_Window* window)
 		//Render frame
 		app->render();
 		if (app->render_gui) renderDebug(window, app);
-
-		//Swap between front buffer and back buffer
+		// swap between front buffer and back buffer
 		SDL_GL_SwapWindow(window);
 
 		//Update events
@@ -233,13 +232,8 @@ int main(int argc, char **argv)
 	if(fullscreen)
 		size = getDesktopSize(0);
 
-	//TaskManager tm;
-	//tm.startThread();
-	//Task* t = new Task([]() { std::cout << "TEST" << std::endl; });
-	//tm.addTask(t);
-
 	//create the application window (WINDOW_WIDTH and WINDOW_HEIGHT are two macros defined in includes.h)
-	SDL_Window*window = createWindow("TJE", (int)size.x, (int)size.y, fullscreen );
+	SDL_Window*window = createWindow("GTR", (int)size.x, (int)size.y, fullscreen );
 	if (!window)
 		return 0;
 	int window_width, window_height;

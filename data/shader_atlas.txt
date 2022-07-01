@@ -1194,13 +1194,13 @@ void main()
 
 	
 	//convert to local space
-vec3 localpos = (u_imodel * vec4(world_position,1.0)).xyz;
+	vec3 localpos = (u_imodel * vec4(world_position,1.0)).xyz;
 
-//if outside of the volume
-if( localpos.x < -0.5 || localpos.x > 0.5 ||
-    localpos.y < -0.5 || localpos.y > 0.5 ||
-    localpos.z < -0.5 || localpos.z > 0.5 )
-		discard;
+	//if outside of the volume
+	if( localpos.x < -0.5 || localpos.x > 0.5 ||
+	    localpos.y < -0.5 || localpos.y > 0.5 ||
+	    localpos.z < -0.5 || localpos.z > 0.5 )
+			discard;
 
 
 	vec2 decal_uv = localpos.xz + vec2(0.5);
