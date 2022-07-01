@@ -202,7 +202,7 @@ void GTR::Renderer::renderWithoutLights()
 	//Upload scene uniforms
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_emissive_materials", scene->emissive_materials);
-	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_time", (float)getTime());
 
 	//Send render calls to the GPU
 	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
@@ -579,7 +579,7 @@ void GTR::Renderer::setForwardSceneUniforms(Shader* shader)
 	shader->setUniform("u_white_illumination", scene->tone_mapper.white_illumination);
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_time", (float)getTime());
 	shader->setUniform("u_occlusion", scene->occlusion);
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
@@ -715,7 +715,7 @@ void GTR::Renderer::setDeferredSceneUniforms(Shader* shader)
 	shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
 	shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
 	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_time", (float)getTime());
 	shader->setUniform("u_occlusion", scene->occlusion);
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
@@ -771,7 +771,7 @@ void GTR::Renderer::GBuffers()
 	//Upload Scene Uniforms
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_time", getTime());
+	shader->setUniform("u_time", (float)getTime());
 
 	//Send render calls to the GPU
 	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
