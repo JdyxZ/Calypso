@@ -371,6 +371,10 @@ void Application::renderDebugGUI(void)
 	//Background Color
 	ImGui::ColorEdit3("Background color", scene->background_color.v);
 
+	ImGui::Text("\nVoluminetic View");
+
+	ImGui::Checkbox("Show Voluminetic", &scene->show_volumetric);
+
 	ImGui::Text("\nFX Properties");
 
 	ImGui::SliderFloat("Intensity", &scene->debug1, 0.0, 2.0);

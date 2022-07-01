@@ -63,6 +63,9 @@ GTR::Scene::Scene()
 	show_ssaop = false;
 	SSAO_type = SSAOType::SSAO;
 
+	//Voluminetic
+	show_volumetric = false;
+
 	//FX properties
 	contrast = 1.0;
 	saturation = 1.0;
@@ -87,7 +90,8 @@ GTR::BaseEntity* GTR::Scene::createEntity(std::string type)
 {
 	if (type == "PREFAB") return new GTR::PrefabEntity();
 	else if (type == "LIGHT") return new GTR::LightEntity();
-	else   return NULL;
+	else if (type == "DECAL") return new GTR::DecalEntity();
+	else return NULL;
 }
 
 void GTR::Scene::addEntity(BaseEntity* entity)
@@ -428,6 +432,15 @@ void GTR::PrefabEntity::renderInMenu()
 		ImGui::TreePop();
 	}
 #endif
+}
+
+GTR::DecalEntity::DecalEntity(){
+	entity_type = EntityType::DECAL;
+}
+
+void GTR::DecalEntity::configure(cJSON* json) {
+	if (cJSON_GetObjectItem(json, "texture"))
+		texture = cJSON_GetObjectItem(json, "texture")->valuestring;
 }
 
 GTR::LightEntity::LightEntity()

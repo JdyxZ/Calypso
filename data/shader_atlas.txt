@@ -19,6 +19,12 @@ depth depth.vs color.fs
 linearize quad.vs linearize.fs
 linearize_atlas quad.vs linearize_atlas.fs
 
+//Decals
+decal pixel.vs decal.fs
+
+//Volumetric
+volumetric quad.vs volumetric.fs
+
 //PostFX
 greyscale quad.vs greyscale.fs
 contrast quad.vs contrast.fs
@@ -118,10 +124,16 @@ vec3 PhongEquation(const in vec3 light_color, const in vec3 L, const in float li
     //Compute light factors
     float diffuse_factor = light_attenuation * NdotL;
     float specular_factor = 0.0;
-    if(specular_light) specular_factor = light_attenuation * roughness * pow(RdotV, shininess_factor); 
+    if(specular_light) specular_factor = light_attenuation * roughness * pow(RdotV, shininess_factor);
 
-    //Phong equation
-	vec3 light = (diffuse_factor + specular_factor) * light_color * light_intensity * shadow_factor;
+	vec3 light;
+
+
+    if(specular_factor >= 0){
+    	//Phong equation
+		light = (diffuse_factor + specular_factor) * light_color * light_intensity * shadow_factor;
+    }
+    
 
 	//Return light
 	return light;
@@ -213,6 +225,7 @@ vec3 specularBRDF( const in float roughness, const in vec3 f0, const in float Nd
 	//Normalize specular reflection
 	specular_reflection /= (4.0 * NdotL * NdotV + 1e-6);
 
+	
 	//Cook-Torrance specular
 	return specular_reflection;
 }
@@ -1140,9 +1153,63 @@ void main()
 	GB2 = vec4(omr,emissive_color.z);
 }
 
+\decal.fs
+
+#version 330 core
+
+//Interpolated variables
+in vec2 v_uv;
+
+//Textures
+uniform sampler2D u_gb0_texture;
+uniform sampler2D u_gb1_texture;
+uniform sampler2D u_gb2_texture;
+uniform sampler2D u_depth_texture;
+uniform sampler2D u_decal_texture;
+
+//Scene uniforms
+uniform mat4 u_model;
+uniform mat4 u_imodel;
+uniform mat4 u_viewprojection;
+uniform mat4 u_inverse_viewprojection;
+uniform vec2 u_iRes;
+uniform vec3 u_camera_position;
+
+out vec4 FragColor;
+
+void main()
+{
+	//Extract uvs from pixel screenpos
+	vec2 uv = gl_FragCoord.xy * u_iRes;
+
+	//compute world position from pixel depth
+	float depth = texture( u_depth_texture, uv ).x;
+
+	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
+	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
+	vec3 world_position = proj_worldpos.xyz / proj_worldpos.w;
+
+	
+	//convert to local space
+vec3 localpos = (u_imodel * vec4(world_position,1.0)).xyz;
+
+//if outside of the volume
+if( localpos.x < -0.5 || localpos.x > 0.5 ||
+    localpos.y < -0.5 || localpos.y > 0.5 ||
+    localpos.z < -0.5 || localpos.z > 0.5 )
+		discard;
+
+
+	vec2 decal_uv = localpos.xz + vec2(0.5);
+	
+	//vec4 color = vec4(localpos.xyz, 1.0);
+	vec4 color = texture(u_decal_texture, decal_uv);
+
+	FragColor = color;
+}
+
+
 \volumetric.fs
-
-
 
 #version 330 core
 
@@ -1158,6 +1225,13 @@ uniform mat4 u_inverse_viewprojection;
 uniform vec2 u_iRes;
 uniform vec3 u_camera_position;
 
+
+uniform float u_shadow_index;
+uniform float u_shadow_bias;
+uniform mat4 u_shadow_vp;
+uniform float u_num_shadows;
+uniform sampler2D u_shadow_atlas;
+
 //Output
 layout(location = 0) out vec3 I0;
 layout(location = 1) out vec3 I1;
@@ -1165,6 +1239,35 @@ layout(location = 1) out vec3 I1;
 out vec4 FragColor;
 
 const int SAMPLES = 64;
+
+float testShadowMap(vec3 pos){
+	//project our 3D position to the shadowmap
+	vec4 proj_pos = u_shadow_vp * vec4(pos,1.0);
+
+	//from homogeneus space to clip space
+	vec2 shadow_uv = proj_pos.xy / proj_pos.w;
+
+	//from clip space to uv space
+	shadow_uv = shadow_uv * 0.5 + vec2(0.5);
+
+	//get point depth [-1 .. +1] in non-linear space
+	float real_depth = (proj_pos.z - u_shadow_bias) / proj_pos.w;
+
+	//normalize from [-1..+1] to [0..+1] still non-linear
+	real_depth = real_depth * 0.5 + 0.5;
+
+	//read depth from depth buffer in [0..+1] non-linear
+	float shadow_depth = texture( u_shadow_atlas, shadow_uv).x;
+
+	//compute final shadow factor by comparing
+	float shadow_factor = 1.0;
+
+	//we can compare them, even if they are not linear
+	if( shadow_depth < real_depth )
+		shadow_factor = 0.0;
+	return shadow_factor;
+
+}
 
 void main()
 {
@@ -1175,13 +1278,13 @@ void main()
 
 	vec4 screen_pos = vec4(uv.x*2.0-1.0, uv.y*2.0-1.0, depth*2.0-1.0, 1.0);
 	vec4 proj_worldpos = u_inverse_viewprojection * screen_pos;
-	vec3 worldpos = proj_worldpos.xyz / proj_worldpos.w;
+	vec3 world_position = proj_worldpos.xyz / proj_worldpos.w;
 
-	vec3 color = vec3(0.0);
+	vec3 irradiance = vec3(0.0);
 
 	//compute ray info
 	vec3 ray_start = u_camera_position;
-	vec3 ray_dir = ( worldpos - ray_start );
+	vec3 ray_dir = ( world_position - ray_start );
 	float ray_length = length(ray_dir);
 	ray_dir /= ray_length;
 	ray_dir = normalize(ray_dir);
@@ -1196,11 +1299,13 @@ void main()
 	//how much transparency gets removed per world unit of the ray
 	float air_density = 0.001;
 
-
 	for(int i = 0; i < SAMPLES; ++i)
 	{
 		//evaluate contribution
-		//...
+		vec3 light = vec3(1.0) * testShadowMap(world_position);
+
+		//accumulate the amount of light
+		irradiance += light * transparency * (air_density * step_dist);
 
 		//reduce visibility
 		transparency -= air_density * step_dist;
@@ -1213,8 +1318,7 @@ void main()
 	}
 
 
-
-	FragColor = vec4(color, 1.0)
+	FragColor = vec4(irradiance, transparency);
 }
 
 
@@ -1424,7 +1528,7 @@ void main()
 	vec4 colorA = texture2D(u_texture, uv);
 	vec4 colorB = texture2D(u_textureB, uv);
 
-	gl_FragColor = (colorA) + colorB* u_intensity;
+	gl_FragColor = (colorA * u_intensity) + colorB;
 }
 
 

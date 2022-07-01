@@ -21,7 +21,7 @@ namespace GTR {
 		LIGHT = 2,
 		CAMERA = 3,
 		REFLECTION_PROBE = 4,
-		DECALL = 5
+		DECAL = 5
 	};
 
 	enum SSAOType {
@@ -94,6 +94,17 @@ namespace GTR {
 		LightEntity();
 		LightEntity(LightType light_type);
 		virtual void renderInMenu();
+		virtual void configure(cJSON* json);
+	};
+
+	//represents one prefab in the scene
+	class DecalEntity : public GTR::BaseEntity
+	{
+	public:
+		std::string texture;
+
+		DecalEntity();
+		virtual void renderInMenu() {};
 		virtual void configure(cJSON* json);
 	};
 
@@ -192,6 +203,9 @@ namespace GTR {
 		bool shadow_resolution_trigger; //Triggers if shadow resolution has been changed.
 		bool light_model_trigger; //Triggers if light model has been changed.
 		bool buffer_range_trigger; //Triggers if the deferred buffer range has changed.
+
+		//Voluminetric
+		bool show_volumetric;
 
 		//FX properties
 		float contrast;

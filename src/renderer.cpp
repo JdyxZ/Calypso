@@ -51,6 +51,7 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	//FBOs
 	shadow_fbo = NULL;
 	gbuffers_fbo = NULL;
+	decals_fbo = NULL;
 	illumination_fbo = NULL;
 	ssao_fbo = NULL;
 	ssao_p_fbo = NULL;
@@ -58,6 +59,8 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 
 	rand_points_ssao = generateSpherePoints(64, 1, false);
 	rand_points_ssao_p = generateSpherePoints(64, 1, true);
+
+	cube.createCube();
 
 	//Volumetric
 	direct_light = NULL;
@@ -119,6 +122,7 @@ void Renderer::processScene()
 	lights.clear();
 	render_calls.clear();
 	transparent_objects.clear();
+	decals.clear();
 
 	//Generate render calls and fill the light vector
 	for (auto it = scene->entities.begin(); it != scene->entities.end(); ++it)
@@ -141,6 +145,11 @@ void Renderer::processScene()
 			lights.push_back(light);
 			if (light->light_type == LightType::DIRECTIONAL)
 				direct_light = light;
+		}
+		//is a decal!
+		if (ent->entity_type == DECAL) {
+			DecalEntity* decal = (DecalEntity*)ent;
+			decals.push_back(decal);
 		}
 	}
 	
@@ -688,6 +697,8 @@ void GTR::Renderer::renderDeferred()
 	//Create and render the GBuffers
 	GBuffers();
 
+	DecalsFBO();
+
 	SSAO();
 	//Illumination and transparencies
 	IlluminationNTransparencies();
@@ -699,6 +710,9 @@ void GTR::Renderer::renderDeferred()
 	//Show Buffers or render the final frame
 	if (scene->show_buffers)
 		showBuffers();
+	else if (scene->show_volumetric) {
+		volumetric_fbo->color_textures[0]->toViewport();
+	}
 	else
 	{
 		//Reset viewport
@@ -710,33 +724,122 @@ void GTR::Renderer::renderDeferred()
 
 }
 
-void GTR::Renderer::InitVolumetric() {
-	//Crete the illumination fbo if they don't exist yet
-	if (!volumetric_fbo || scene->resolution_trigger || scene->buffer_range_trigger)
+void GTR::Renderer::DecalsFBO() {
+	//Crete the gbuffers fbo if they don't exist yet
+	if (!decals_fbo || scene->resolution_trigger || scene->buffer_range_trigger)
 	{
-		if (volumetric_fbo)
+		if (decals_fbo)
 		{
-			delete volumetric_fbo;
-			volumetric_fbo = NULL;
+			delete decals_fbo;
+			decals_fbo = NULL;
 		}
 
 		//Create a new FBO
-		volumetric_fbo = new FBO();
+		decals_fbo = new FBO();
 
-		//Create one texture with RGB components
-		volumetric_fbo->create(window_size.x, window_size.y,
-			2, 					//two texture
-			GL_RGB, 			//three channels
+		//Create three textures of four components
+		decals_fbo->create(window_size.x, window_size.y,
+			3, 					//three textures
+			GL_RGBA, 			//four channels
 			buffer_range,		//SDR or HDR
 			true);				//add depth_texture
+
 	}
 
-	//Start rendering inside the illumination fbo
+	gbuffers_fbo->color_textures[0]->copyTo(decals_fbo->color_textures[0]);
+	gbuffers_fbo->color_textures[1]->copyTo(decals_fbo->color_textures[1]);
+	gbuffers_fbo->color_textures[2]->copyTo(decals_fbo->color_textures[2]);
+
+	decals_fbo->bind();
+	gbuffers_fbo->depth_texture->copyTo(NULL);
+	decals_fbo->unbind();
+
+	Vector2 i_Res = Vector2(1.0 / (float)window_size.x, 1.0 / (float)window_size.y);
+	Matrix44 inv_camera_vp = camera->viewprojection_matrix;
+	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC0_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glColorMask(true, true, true, false);
+	//Start rendering inside the gbuffers fbo
+	gbuffers_fbo->bind();
+	
+	Shader* shader = Shader::Get("decal");
+	if (!shader)
+		return;
+
+	shader->enable();
+	// Upload textures
+	shader->setTexture("u_gb0_texture", decals_fbo->color_textures[0], 0);
+	shader->setTexture("u_gb1_texture", decals_fbo->color_textures[1], 1);
+	shader->setTexture("u_gb2_texture", decals_fbo->color_textures[2], 2);
+	shader->setTexture("u_depth_texture", decals_fbo->depth_texture, 3);
+
+	shader->setUniform("u_camera_position", camera->eye);
+	shader->setMatrix44("u_viewprojection", camera->viewprojection_matrix);
+	shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
+	shader->setUniform("u_iRes", i_Res); //Pass the inverse window resolution, this may be useful
+
+	for (int i = 0; i < decals.size(); i++)
+	{
+		DecalEntity* decal = decals[i];
+		shader->setUniform("u_model", decal->model);
+		Texture* decal_tex = Texture::Get(decal->texture.c_str());
+		if (!decal_tex)
+			continue;
+		shader->setTexture("u_decal_texture", decal_tex, 5);
+		Matrix44 imodel = decal->model;
+		imodel.inverse();
+		shader->setUniform("u_imodel", imodel);
+		cube.render(GL_TRIANGLES);
+	}
+
+	shader->disable();
+	//Stop rendering to the gbuffers fbo
+	gbuffers_fbo->unbind();
+	glDisable(GL_BLEND);
+	glColorMask(true, true, true, true);
+
+}
+
+void GTR::Renderer::InitVolumetric() {
+	if (true) {
+		//Crete the volumetric fbo if they don't exist yet
+		if (!volumetric_fbo || scene->resolution_trigger || scene->buffer_range_trigger)
+		{
+			if (volumetric_fbo)
+			{
+				delete volumetric_fbo;
+				volumetric_fbo = NULL;
+			}
+
+			//Create a new FBO
+			volumetric_fbo = new FBO();
+
+			//Create one texture with RGB components
+			volumetric_fbo->create(window_size.x, window_size.y,
+				1, 					//two texture
+				GL_RGB, 			//three channels
+				buffer_range,		//SDR or HDR
+				true);				//add depth_texture
+		}
+		//Start rendering inside the volumetric fbo
+		volumetric_fbo->bind();
+
+		RenderVolumetric();
+
+		//Stop rendering to the volumetric fbo
+		volumetric_fbo->unbind();
+	}
+}
+
+void GTR::Renderer::RenderVolumetric() {
+
 	Vector2 i_Res = Vector2(1.0 / (float)volumetric_fbo->color_textures[0]->width, 1.0 / (float)volumetric_fbo->color_textures[0]->height);
 	Matrix44 inv_camera_vp = camera->viewprojection_matrix;
 	inv_camera_vp.inverse(); //Pass the inverse projection of the camera to reconstruct world pos.
-	Mesh* quad;
-	volumetric_fbo->bind();
+	Mesh* quad = Mesh::getQuad();
+
+	
 	Shader* shader = Shader::Get("volumetric");
 	shader->setUniform("u_camera_position", camera->eye);
 	shader->setMatrix44("u_inverse_viewprojection", inv_camera_vp);
@@ -745,29 +848,19 @@ void GTR::Renderer::InitVolumetric() {
 	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
 	//Scene uniforms
 	shader->setUniform("u_light_model", direct_light->model);
-	shader->setUniform("u_diffuse_reflection", scene->diffuse_reflection);
-	shader->setUniform("u_geometry_shadowing", scene->smith_aproximation);
-	shader->setUniform("u_light_pass", scene->light_pass);
-	shader->setUniform("u_gamma_correction", scene->gamma_correction);
 	shader->setUniform("u_viewprojection", camera->viewprojection_matrix);
 	shader->setUniform("u_camera_position", camera->eye);
-	shader->setUniform("u_time", getTime());
-	shader->setUniform("u_occlusion", scene->occlusion);
-	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	shader->setUniform("u_shadow_index", (float)direct_light->shadow_index);
+	shader->setUniform("u_shadow_bias", direct_light->shadow_bias);
+	shader->setMatrix44("u_shadow_vp", direct_light->light_camera->viewprojection_matrix);
 	shader->setVector3("u_directional_front", direct_light->model.rotateVector(Vector3(0, 0, -1)));
 	shader->setUniform("u_area_size", direct_light->area_size);
 	shader->setUniform("u_light_type", 2);
 
 	quad->render(GL_TRIANGLES);
-	
-	//Stop rendering to the illumination fbo
-	volumetric_fbo->unbind();
-	volumetric_fbo->color_textures[0]->toViewport();
 }
-
-
 
 void GTR::Renderer::InitPostFxTextures()
 {

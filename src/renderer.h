@@ -1,6 +1,7 @@
 #pragma once
 #include "prefab.h"
 #include "shader.h"
+#include "mesh.h"
 
 //forward declarations
 class Camera;
@@ -42,9 +43,14 @@ namespace GTR {
 		Camera* camera;
 		Vector2 window_size;
 
+		//Mesh Cube
+
+		Mesh cube;
+
 		//FBOs
 		FBO* shadow_fbo;
 		FBO* gbuffers_fbo;
+		FBO* decals_fbo;
 		FBO* illumination_fbo;
 		FBO* ssao_fbo;
 		FBO* ssao_p_fbo;
@@ -55,6 +61,7 @@ namespace GTR {
 		LightEntity* direct_light;
 		std::vector<RenderCall*> render_calls; // Here we store each RenderCall to be sent to the Shadder.
 		std::vector<RenderCall*> transparent_objects; //Here we store the RenderCalls of the objects that need blending (for Deferred pipeline)
+		std::vector<DecalEntity*> decals; //Here we store each Decal to be sent to the Shadder.
 
 		//SSAO
 		std::vector<Vector3> rand_points_ssao;
@@ -101,6 +108,7 @@ namespace GTR {
 		void renderDeferred();
 		void setDeferredSceneUniforms(Shader* shader);
 		void GBuffers();
+		void DecalsFBO();
 		void clearGBuffers();
 		void renderGBuffers(Shader* shader, RenderCall* rc, Camera* camera);
 		void SSAO();
@@ -129,6 +137,7 @@ namespace GTR {
 
 		//VOlumetricLight
 		void InitVolumetric();
+		void RenderVolumetric();
 		
 		//PostFx
 		void applyFx(Camera* camera, Texture* color_tex, Texture* depth_tex);
