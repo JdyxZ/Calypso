@@ -35,6 +35,7 @@ namespace GTR {
 
 		//FBOs
 		FBO* shadow_fbo;
+		FBO* main_camera_fbo;
 		FBO* gbuffers_fbo;
 		FBO* illumination_fbo;
 
@@ -68,7 +69,9 @@ namespace GTR {
 		//Forward pipeline
 		void renderForward();
 		void setForwardSceneUniforms(Shader* shader);
-		void renderMesh(Shader* shader, RenderCall* rc, Camera* camera); 
+		void renderMesh(Shader* shader, RenderCall* rc, Camera* camera);
+		void renderMainCameraShadowMap();
+
 
 		//Deferred pipeline
 		void renderDeferred();

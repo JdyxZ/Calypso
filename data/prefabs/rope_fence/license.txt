@@ -1,0 +1,11 @@
+Model Information:
+* title:	Rope Fence
+* source:	https://sketchfab.com/3d-models/rope-fence-462e970561664ff9a98de84dfb24d8bf
+* author:	PantherOne (https://sketchfab.com/pantherone)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Rope Fence" (https://sketchfab.com/3d-models/rope-fence-462e970561664ff9a98de84dfb24d8bf) by PantherOne (https://sketchfab.com/pantherone) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -524,6 +524,9 @@ void GTR::Renderer::MultiPassLoop(Shader* shader, Mesh* mesh, std::vector<LightE
 //Forward pipeline
 void GTR::Renderer::renderForward()
 {
+	//Render depth map
+	renderMainCameraShadowMap();
+
 	//Set the clear color (the background color)
 	glClearColor(scene->background_color.x, scene->background_color.y, scene->background_color.z, 1.0);
 
@@ -584,6 +587,14 @@ void GTR::Renderer::setForwardSceneUniforms(Shader* shader)
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	shader->setUniform("u_screen_width", window_size.x);
+	shader->setUniform("u_screen_height", window_size.y);
+	shader->setUniform("u_znear", camera->near_plane);
+	shader->setUniform("u_zfar", camera->far_plane);
+	shader->setUniform("u_fov", camera->fov);
+	shader->setUniform("u_aspect_ratio", camera->aspect);
+	shader->setTexture("u_depth_texture", main_camera_fbo->depth_texture, 5);
+
 }
 
 //Render a mesh with its materials and lights
@@ -663,6 +674,59 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 	}
 }
 
+//Render main camera shadow map
+void GTR::Renderer::renderMainCameraShadowMap()
+{
+	//Crete the gbuffers fbo if they don't exist yet
+	if (!main_camera_fbo || scene->resolution_trigger)
+	{
+		if (main_camera_fbo)
+		{
+			delete main_camera_fbo;
+			main_camera_fbo = NULL;
+		}
+
+		//Create a new FBO
+		main_camera_fbo = new FBO();
+
+		//Create only depth map texture
+		main_camera_fbo->setDepthOnly(window_size.x, window_size.y); 
+	}
+
+	//Speed boost
+	glColorMask(false, false, false, false);
+
+	//Bind the fbo
+	main_camera_fbo->bind();
+
+	//Clear Depth Buffer on the shadow region
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	//Enable camera
+	camera->enable();
+
+	//Iterate over render calls vector
+	for (auto it = render_calls.begin(); it != render_calls.end(); ++it)
+	{
+		//Current render call
+		RenderCall* rc = *it;
+
+		if (rc->material->alpha_mode == eAlphaMode::BLEND)
+			continue;
+
+		if (camera->testBoxInFrustum(rc->world_bounding_box.center, rc->world_bounding_box.halfsize))
+		{
+			renderDepthMap(rc, camera);
+		}
+	}
+	//Unbind the fbo
+	main_camera_fbo->unbind();
+
+	//Reset
+	glViewport(0, 0, window_size.x, window_size.y);
+	glColorMask(true, true, true, true);
+}
+
 // <--------------------------------------------------- Deferred pipeline --------------------------------------------------->
 
 //Deferred pipeline
@@ -720,6 +784,12 @@ void GTR::Renderer::setDeferredSceneUniforms(Shader* shader)
 	shader->setUniform("u_specular_light", scene->specular_light);
 	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
+	shader->setUniform("u_screen_width", window_size.x);
+	shader->setUniform("u_screen_height", window_size.y);
+	shader->setUniform("u_znear", camera->near_plane);
+	shader->setUniform("u_zfar", camera->far_plane);
+	shader->setUniform("u_fov", camera->fov);
+	shader->setUniform("u_aspect_ratio", camera->aspect);
 
 	//Upload textures
 	shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
