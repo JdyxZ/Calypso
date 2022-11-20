@@ -585,7 +585,6 @@ void GTR::Renderer::setForwardSceneUniforms(Shader* shader)
 	shader->setUniform("u_time", (float)getTime());
 	shader->setUniform("u_occlusion", scene->occlusion);
 	shader->setUniform("u_specular_light", scene->specular_light);
-	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
 	shader->setUniform("u_screen_width", window_size.x);
 	shader->setUniform("u_screen_height", window_size.y);
@@ -594,6 +593,9 @@ void GTR::Renderer::setForwardSceneUniforms(Shader* shader)
 	shader->setUniform("u_fov", camera->fov);
 	shader->setUniform("u_aspect_ratio", camera->aspect);
 
+	//Upload textures
+	if (scene->shadow_atlas)
+		shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	if (main_camera_fbo->depth_texture)
 		shader->setTexture("u_depth_texture", main_camera_fbo->depth_texture, 5);
 
@@ -784,7 +786,6 @@ void GTR::Renderer::setDeferredSceneUniforms(Shader* shader)
 	shader->setUniform("u_time", (float)getTime());
 	shader->setUniform("u_occlusion", scene->occlusion);
 	shader->setUniform("u_specular_light", scene->specular_light);
-	shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
 	shader->setUniform("u_screen_width", window_size.x);
 	shader->setUniform("u_screen_height", window_size.y);
@@ -794,10 +795,16 @@ void GTR::Renderer::setDeferredSceneUniforms(Shader* shader)
 	shader->setUniform("u_aspect_ratio", camera->aspect);
 
 	//Upload textures
-	shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
-	shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
-	shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
-	shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+	if (scene->shadow_atlas) 
+		shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
+	if (gbuffers_fbo)
+	{
+		shader->setTexture("u_gb0_texture", gbuffers_fbo->color_textures[0], 0);
+		shader->setTexture("u_gb1_texture", gbuffers_fbo->color_textures[1], 1);
+		shader->setTexture("u_gb2_texture", gbuffers_fbo->color_textures[2], 2);
+		shader->setTexture("u_depth_texture", gbuffers_fbo->depth_texture, 3);
+	}
+
 }
 
 //GBuffers
