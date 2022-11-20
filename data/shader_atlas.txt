@@ -379,9 +379,9 @@ float pW = 1.0/screen_width;
 float pH = 1.0/screen_height;
 vec2 noiseOffset2d = vec2(max(1.0 - noiseamount, 0.0), 0.0);
 
-vec3 getLinearColor(vec2 coord)
+vec3 getLinearColor(const in vec3 albedo)
 {    
-    vec3 C = vec3(texture2D(u_color_texture, coord));
+    vec3 C = albedo;
     C.r = pow(C.r, 2.2);
     C.g = pow(C.g, 2.2);
     C.b = pow(C.b, 2.2);
@@ -406,7 +406,6 @@ vec3 linearTosRGB(vec3 C)
     return C.rgb;
 }
 
-
 float getLinearDepth(vec2 coord)
 {
     float zdepth = texture2D(u_depth_texture, coord).x;
@@ -426,9 +425,9 @@ vec3 getViewPosition(vec2 coord)
     return getViewVector(coord) * getLinearDepth(coord);
 }
 
-vec3 getViewNormal(vec2 coord)
+vec3 getViewNormal(const in vec3 normal_vector)
 {
-	return normalize((texture2D(u_normal_texture, coord).rgb - vec3(0.5)) * vec3(-2.0, -2.0, 2.0));
+	return normalize((normal_vector - vec3(0.5)) * vec3(-2.0, -2.0, 2.0));
 }
 
 
@@ -485,13 +484,14 @@ mat2 deltaRotationMatrix = mat2(cosTheta, -sinTheta, sinTheta, cosTheta);
 vec2 sampleNoise = normalize(rand2D(v_uv));
 mat2 rotationMatrix = mat2(sampleNoise.x, -sampleNoise.y, sampleNoise.y,  sampleNoise.x);
 
-float computeOcclusion()
+
+float computeOcclusion(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in vec3 omr, const in float depth)
 {
     
-    vec3 color = texture2D(u_color_texture,v_uv).rgb;
+    vec3 color = albedo;
     
     vec3 originVS = getViewPosition(v_uv);
-    vec3 normalVS = getViewNormal(v_uv);
+    vec3 normalVS = getViewNormal(normal_vector);
     
     if(originVS.z > fogCutoff)
     {
@@ -613,11 +613,11 @@ float computeLightAttenuation(in float light_distance, in float light_max_distan
 	return attenuation_factor;
 }
 
-vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in vec3 omr)
+vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in vec3 omr, const in float depth)
 {
 	//Compute ambient factor
 	float occlusion_factor = 1.0;
-	if(u_occlusion) occlusion_factor = computeOcclusion();
+	if(u_occlusion) occlusion_factor = computeOcclusion(normal_vector, view_vector, world_position, albedo, omr, depth);
 
 	//Set ambient light to phong light
 	vec3 light = occlusion_factor * u_ambient_light;
@@ -724,11 +724,11 @@ vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in
 	return light;
 }
 
-vec3 Multipass(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in vec3 omr)
+vec3 Multipass(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in vec3 omr, const in float depth)
 {
 	//Compute ambient factor
 	float occlusion_factor = 1.0;
-	if(u_occlusion) occlusion_factor = computeOcclusion();
+	if(u_occlusion) occlusion_factor = computeOcclusion(normal_vector, view_vector, world_position, albedo, omr, depth);
 
 	//Set ambient light to phong light
 	vec3 light = occlusion_factor * u_ambient_light;
@@ -978,15 +978,18 @@ void main()
 	//View vector
 	vec3 view_vector = normalize(u_camera_position - v_world_position);
 
+	//Depth
+	float depth = texture2D( u_depth_texture, v_uv ).x;
+
 	//Compute light
 	vec3 light;
 	if(u_light_pass == 0) //Multi pass lighting
 	{
-		light = Multipass(normal_vector, view_vector, v_world_position, color.xyz, omr);
+		light = Multipass(normal_vector, view_vector, v_world_position, color.xyz, omr, depth);
 	} 
 	else if(u_light_pass == 1) //Single pass lighting
 	{
-		light = Singlepass(normal_vector, view_vector, v_world_position, color.xyz, omr);
+		light = Singlepass(normal_vector, view_vector, v_world_position, color.xyz, omr, depth);
 	} 
 	
 	//Final color
@@ -1084,11 +1087,11 @@ void main()
 	vec3 light;
 	if(u_light_pass == 0) //Multi pass lighting
 	{
-		light = Multipass(normal_vector, view_vector, world_position, color.xyz, omr);
+		light = Multipass(normal_vector, view_vector, world_position, color.xyz, omr, depth);
 	} 
 	else if(u_light_pass == 1) //Single pass lighting
 	{
-		light = Singlepass(normal_vector, view_vector, world_position, color.xyz, omr);
+		light = Singlepass(normal_vector, view_vector, world_position, color.xyz, omr, depth);
 	} 
 
 	//Final color

@@ -90,7 +90,7 @@ void Renderer::renderScene()
 		renderDeferred();
 		break;
 	}
-
+	
 	//Debug shadow maps
 	if (scene->show_atlas) showShadowAtlas();
 }
@@ -677,7 +677,7 @@ void GTR::Renderer::renderMesh(Shader* shader, RenderCall* rc, Camera* camera)
 //Render main camera shadow map
 void GTR::Renderer::renderMainCameraShadowMap()
 {
-	//Crete the gbuffers fbo if they don't exist yet
+	//Crete the main camera fbo if they don't exist yet or resolution have changed
 	if (!main_camera_fbo || scene->resolution_trigger)
 	{
 		if (main_camera_fbo)
