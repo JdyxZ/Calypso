@@ -593,7 +593,9 @@ void GTR::Renderer::setForwardSceneUniforms(Shader* shader)
 	shader->setUniform("u_zfar", camera->far_plane);
 	shader->setUniform("u_fov", camera->fov);
 	shader->setUniform("u_aspect_ratio", camera->aspect);
-	shader->setTexture("u_depth_texture", main_camera_fbo->depth_texture, 5);
+
+	if (main_camera_fbo->depth_texture)
+		shader->setTexture("u_depth_texture", main_camera_fbo->depth_texture, 5);
 
 }
 
@@ -982,6 +984,9 @@ void GTR::Renderer::IlluminationNTransparencies()
 			true);				//add depth_texture
 	}
 
+	//Render camera depth map
+	renderMainCameraShadowMap();
+
 	//Start rendering inside the illumination fbo
 	illumination_fbo->bind();
 
@@ -1180,6 +1185,7 @@ void GTR::Renderer::renderSphereIllumination()
 //Render objects with transparencies
 void GTR::Renderer::renderTransparentObjects()
 {
+
 	//Get forward shader
 	Shader* shader = Shader::Get("forward");
 
