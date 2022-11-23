@@ -593,6 +593,7 @@ void GTR::Renderer::setForwardSceneUniforms(Shader* shader)
 	shader->setUniform("u_screen_width", window_size.x);
 	shader->setUniform("u_screen_height", window_size.y);
 	shader->setUniform("u_projection", camera->projection_matrix);
+	shader->setUniform("u_view", camera->view_matrix);
 	shader->setUniform("u_camera_nearfar", Vector2(camera->near_plane, camera->far_plane));
 
 	//Upload textures
