@@ -52,9 +52,13 @@ Renderer::Renderer(Scene* scene, Camera* camera, int window_width, int window_he
 	shadow_fbo = NULL;
 	gbuffers_fbo = NULL;
 	illumination_fbo = NULL;
+	main_camera_fbo = NULL;
 
 	//Windows size
 	window_size = Vector2(window_width, window_height);
+
+	//Noise texture
+	noise_texture = Texture::Get("data//textures//BlueNoise470.png");
 }
 
 //< --------------------------------------------------- Scene render --------------------------------------------------->
@@ -588,16 +592,16 @@ void GTR::Renderer::setForwardSceneUniforms(Shader* shader)
 	shader->setUniform("u_num_shadows", (float)scene->num_shadows);
 	shader->setUniform("u_screen_width", window_size.x);
 	shader->setUniform("u_screen_height", window_size.y);
-	shader->setUniform("u_znear", camera->near_plane);
-	shader->setUniform("u_zfar", camera->far_plane);
-	shader->setUniform("u_fov", camera->fov);
-	shader->setUniform("u_aspect_ratio", camera->aspect);
+	shader->setUniform("u_projection", camera->projection_matrix);
+	shader->setUniform("u_camera_nearfar", Vector2(camera->near_plane, camera->far_plane));
 
 	//Upload textures
 	if (scene->shadow_atlas)
 		shader->setTexture("u_shadow_atlas", scene->shadow_atlas, 8);
 	if (main_camera_fbo->depth_texture)
 		shader->setTexture("u_depth_texture", main_camera_fbo->depth_texture, 5);
+	if (noise_texture)
+		shader->setTexture("u_noise_texture", noise_texture, 6);
 
 }
 

@@ -32,6 +32,7 @@ namespace GTR {
 		Scene* scene;
 		Camera* camera;
 		Vector2 window_size;
+		Texture* noise_texture;
 
 		//FBOs
 		FBO* shadow_fbo;
