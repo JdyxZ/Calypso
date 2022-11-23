@@ -394,13 +394,10 @@ float computeOcclusion(const in vec3 normal_vector, const in vec3 world_position
 	float occlusion = 0.0;
 
 	//View Position
-    vec3 pos = vec3(v_uv, linearDepth(v_uv));
-    vec3 NDC_POS = (2.0 * pos) - 1.0; // normalized device coordinates
-    vec4 unprojectPosition = inverse(u_projection) * vec4(NDC_POS, 1.0);
-    vec3 viewPosition = unprojectPosition.xyz / unprojectPosition.w;
+    vec4 viewPosition = u_view * vec4( world_position, 1.0 );
 
     //Normal 
-    vec4 normal = depthToNormal(v_uv);
+    vec4 viewNormal = u_view * vec4( normal_vector, 1.0 );
 
 	//Jittering
     vec3 sampleNoise = texture(u_noise_texture, v_uv * noiseScale).xyz;
@@ -419,7 +416,7 @@ float computeOcclusion(const in vec3 normal_vector, const in vec3 world_position
         vec2 samplingDirection = rotationMatrix * vec2(cos(samplingDirectionAngle), sin(samplingDirectionAngle));
  
         //Tangent angle (inverse cosine)
-        float tangentAngle = acos(dot(vec3(samplingDirection, 0.0), normal.xyz)) - (0.5 * PI) + TANGENT_BIAS;
+        float tangentAngle = acos(dot(vec3(samplingDirection, 0.0), viewNormal.xyz)) - (0.5 * PI) + TANGENT_BIAS;
         float horizonAngle = tangentAngle; //set the horizon angle to the tangent angle to begin with
  
         vec3 LastDifference = vec3(0);
@@ -444,7 +441,7 @@ float computeOcclusion(const in vec3 normal_vector, const in vec3 world_position
             // Now that we have the view-space position of the offset sample point
             // We can check the distance from our current fragment to the offset point
  
-            vec3 diff = viewSpaceSteppedPosition.xyz - viewPosition;
+            vec3 diff = viewSpaceSteppedPosition.xyz - viewPosition.xyz;
             // If the distance is less than the set radius
             if(length(diff) < RADIUS){
  
