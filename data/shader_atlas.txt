@@ -350,7 +350,6 @@ uniform float u_znear;
 uniform float u_zfar;
 uniform float u_fov;
 uniform float u_aspect_ratio;
-
 uniform mat4 u_viewprojection;
 
 //USER VARIABLES-----------------------------------------------
@@ -467,7 +466,7 @@ const mat4 getViewProjectionMatrix() {
     return result;
 }
 
-mat4 VPM = getViewProjectionMatrix();
+mat4 VPM = u_viewprojection;
 mat4 viewProjectionInverseMatrix  = inverse(VPM);
     
 float radiusSS = sampleRadius;
@@ -485,12 +484,12 @@ vec2 sampleNoise = normalize(rand2D(v_uv));
 mat2 rotationMatrix = mat2(sampleNoise.x, -sampleNoise.y, sampleNoise.y,  sampleNoise.x);
 
 
-float computeOcclusion(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in vec3 omr, const in float depth)
+float computeOcclusion(const in vec3 normal_vector, const in vec3 view_vector, const in vec3 world_position, const in vec3 albedo, const in float depth)
 {
     
     vec3 color = albedo;
     
-    vec3 originVS = getViewPosition(v_uv);
+    vec3 originVS = world_position;
     vec3 normalVS = getViewNormal(normal_vector);
     
     if(originVS.z > fogCutoff)
@@ -537,11 +536,6 @@ float computeOcclusion(const in vec3 normal_vector, const in vec3 view_vector, c
     
     occlusion = 1.0 - occlusion / float(sampleDirections);
     occlusion = clamp(pow(occlusion, 1.0 + intensity), 0.0, 1.0);
-    
-    vec3 lumcoeff = vec3(0.299,0.587,0.114);
-    float lum = dot(color.rgb, lumcoeff) * lumInfluence;
-    
-    occlusion = lum + ((1.0 - lum) * occlusion);
     
     return occlusion;
 }
@@ -617,7 +611,7 @@ vec3 Singlepass(const in vec3 normal_vector, const in vec3 view_vector, const in
 {
 	//Compute ambient factor
 	float occlusion_factor = 1.0;
-	if(u_occlusion) occlusion_factor = computeOcclusion(normal_vector, view_vector, world_position, albedo, omr, depth);
+	//if(u_occlusion) occlusion_factor = computeOcclusion(normal_vector, view_vector, albedo, depth);
 
 	//Set ambient light to phong light
 	vec3 light = occlusion_factor * u_ambient_light;
@@ -728,7 +722,7 @@ vec3 Multipass(const in vec3 normal_vector, const in vec3 view_vector, const in 
 {
 	//Compute ambient factor
 	float occlusion_factor = 1.0;
-	if(u_occlusion) occlusion_factor = computeOcclusion(normal_vector, view_vector, world_position, albedo, omr, depth);
+	//if(u_occlusion) occlusion_factor = computeOcclusion(normal_vector, view_vector, albedo, depth);
 
 	//Set ambient light to phong light
 	vec3 light = occlusion_factor * u_ambient_light;
@@ -1001,7 +995,9 @@ void main()
 	}
 
 	//Output: Gamma space color
-	FragColor = gamma(color);
+	//FragColor = gamma(color);
+	FragColor = vec4(vec3(computeOcclusion(normal_vector, view_vector, v_world_position, color.xyz, depth)), 1.0);
+
 }
 
 \quad.vs
